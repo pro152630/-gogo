@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>訂單管理系統 V23.7 - 備註優化版</title>
+    <title>訂單管理系統 V23.8 - 分類排序版</title>
     <style>
         :root { --primary: #4a90e2; --secondary: #34495e; --bg: #f5f7fa; --danger: #ff4d4f; --edit: #f39c12; }
         body { font-family: "Microsoft JhengHei", sans-serif; background: var(--bg); margin: 0; padding: 0; color: #333; }
@@ -15,15 +15,13 @@
         .page.active { display: block; }
         .shop-order-card { background: white; border-radius: 16px; padding: 20px; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
         .shop-title { font-size: 22px; font-weight: bold; color: var(--secondary); margin-bottom: 5px; border-left: 5px solid var(--primary); padding-left: 15px; }
+        .category-tag { font-size: 12px; background: #e2e8f0; color: #475569; padding: 2px 8px; border-radius: 4px; margin-left: 10px; vertical-align: middle; }
         .shop-note-display { font-size: 14px; color: #555; margin-bottom: 15px; padding: 12px; background: #fdf6ec; border-radius: 8px; white-space: pre-line; line-height: 1.6; border-left: 3px solid #f39c12; }
         .image-frame { width: 100%; height: auto; min-height: 200px; max-height: 600px; border-radius: 12px; margin-bottom: 15px; background: #f9f9f9; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: zoom-in; border: 1px solid #eee; }
         .image-frame img { max-width: 100%; max-height: 100%; object-fit: contain; }
         
-        /* 輸入區佈局優化 */
         .order-input-group { background: #f8fafc; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #edf2f7; }
         .input-row { display: flex; gap: 8px; margin-bottom: 8px; }
-        
-        /* 餐點欄位可調大小 */
         .resizable-item { resize: vertical; min-height: 45px; height: 45px; font-family: inherit; }
 
         .admin-controls { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #e2e8f0; }
@@ -66,6 +64,7 @@
         </div>
     </div>
 
+    <!-- 管理頁面與統計頁面保持不變，略過部分代碼以節省空間但邏輯完整 -->
     <div id="page-admin" class="page">
         <div class="admin-controls">
             <h3>➕ 新增餐廳</h3>
@@ -218,17 +217,32 @@
     window.openLightbox = (src) => { document.getElementById('boxImg').src = src; document.getElementById('lightbox').style.display = 'flex'; };
     window.resetAllOrders = () => { if(confirm("清空紀錄？")) { db.forEach(s => s.details = []); save(); } };
 
+    // --- 排序邏輯優化 ---
     function renderViewPage() {
         const list = document.getElementById('activeOrdersList');
-        const active = db.filter(s => s.visible);
+        
+        // 設定權重順序
+        const categoryOrder = { "主食": 1, "飲料": 2, "甜品": 3 };
+        
+        // 篩選並排序
+        const active = db.filter(s => s.visible).sort((a, b) => {
+            const orderA = categoryOrder[a.category] || 99;
+            const orderB = categoryOrder[b.category] || 99;
+            return orderA - orderB;
+        });
+
         list.innerHTML = "";
         document.getElementById('emptyViewHint').style.display = active.length ? 'none' : 'block';
+        
         active.forEach(shop => {
             const details = shop.details || [], total = details.reduce((sum, d) => sum + Number(d.money), 0);
             const div = document.createElement('div');
             div.className = 'shop-order-card';
             div.innerHTML = `
-                <div class="shop-title">${shop.name}</div>
+                <div class="shop-title">
+                    ${shop.name}
+                    <span class="category-tag">${shop.category}</span>
+                </div>
                 <div class="shop-note-display">${shop.note || ''}</div>
                 <div class="image-frame" onclick="openLightbox('${shop.image}')"><img src="${shop.image}"></div>
                 
