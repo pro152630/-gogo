@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>訂單管理系統 V23.5 - 原圖上傳版</title>
+    <title>訂單管理系統 V23.6 - 搜尋與篩選版</title>
     <style>
         :root { --primary: #4a90e2; --secondary: #34495e; --bg: #f5f7fa; --danger: #ff4d4f; --edit: #f39c12; }
         body { font-family: "Microsoft JhengHei", sans-serif; background: var(--bg); margin: 0; padding: 0; color: #333; }
@@ -19,6 +19,7 @@
         .image-frame { width: 100%; height: auto; min-height: 200px; max-height: 600px; border-radius: 12px; margin-bottom: 15px; background: #f9f9f9; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: zoom-in; border: 1px solid #eee; }
         .image-frame img { max-width: 100%; max-height: 100%; object-fit: contain; }
         .admin-controls { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #e2e8f0; }
+        .search-box { display: flex; gap: 10px; margin-bottom: 15px; background: #ebf2f9; padding: 15px; border-radius: 10px; }
         .history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; margin-top: 20px; }
         .history-card { border: 2px solid #e2e8f0; border-radius: 10px; overflow: hidden; background: #fff; position: relative; opacity: 0.6; filter: grayscale(100%); transition: 0.3s; }
         .history-card.is-active { opacity: 1; filter: grayscale(0%); border-color: var(--primary); box-shadow: 0 4px 10px rgba(74,144,226,0.15); }
@@ -45,7 +46,7 @@
 </div>
 
 <div class="container">
-    <!-- 第一頁：今日點餐 -->
+    <!-- 第一頁 -->
     <div id="page-view" class="page active">
         <div id="activeOrdersList"></div>
         <div id="emptyViewHint" style="text-align:center; color:#999; padding:80px 20px;">
@@ -54,7 +55,7 @@
         </div>
     </div>
 
-    <!-- 第二頁：餐廳管理 -->
+    <!-- 第二頁 -->
     <div id="page-admin" class="page">
         <div class="admin-controls">
             <h3>➕ 新增餐廳</h3>
@@ -66,22 +67,33 @@
             </select>
             <textarea id="newNote" style="margin-bottom:10px; height:100px;" placeholder="備註資訊">電話：&#10;時間：&#10;公休：</textarea>
             <input type="file" id="newFile" accept="image/*" style="margin-bottom:10px;">
-            <button id="addBtn" class="btn btn-primary" style="width:100%;" onclick="addShop()">儲存並同步 (原圖)</button>
+            <button id="addBtn" class="btn btn-primary" style="width:100%;" onclick="addShop()">儲存並同步</button>
             <p id="loadingHint" style="display:none; color: var(--primary); text-align:center;">正在讀取原圖數據...</p>
         </div>
+
         <div class="admin-controls">
+            <h3>🔍 搜尋與篩選</h3>
+            <div class="search-box">
+                <input type="text" id="adminSearch" placeholder="搜尋餐廳名稱..." oninput="renderAdminGrid()" style="flex:2">
+                <select id="adminFilter" onchange="renderAdminGrid()" style="flex:1">
+                    <option value="全部">全部類型</option>
+                    <option value="主食">🍱 主食</option>
+                    <option value="飲料">🥤 飲料</option>
+                    <option value="甜品">🍰 甜品</option>
+                </select>
+            </div>
             <button class="btn btn-danger" style="width:100%; background:#666;" onclick="resetAllOrders()">🧹 清除今日所有點餐紀錄</button>
         </div>
+        
         <div class="history-grid" id="historyGrid"></div>
     </div>
 
-    <!-- 第三頁：統計 -->
+    <!-- 第三頁 -->
     <div id="page-summary" class="page">
         <div id="summaryContent"></div>
     </div>
 </div>
 
-<!-- 編輯彈窗 -->
 <div id="editModal" class="modal">
     <div class="modal-content">
         <h3>📝 修改餐廳資訊</h3>
@@ -141,7 +153,7 @@
     window.addDetail = (id) => {
         const pI = document.getElementById(`p-${id}`), iI = document.getElementById(`i-${id}`), mI = document.getElementById(`m-${id}`);
         const p = pI.value.trim(), i = iI.value.trim(), m = mI.value.trim();
-        if(!p || !i || !m) return alert("請填寫姓名、餐點與金額");
+        if(!p || !i || !m) return alert("請填寫完整資訊");
         const sIdx = db.findIndex(s => s.id === id);
         if(!db[sIdx].details) db[sIdx].details = [];
         db[sIdx].details.push({ person: p, item: i, money: Number(m), isDone: false });
@@ -151,7 +163,7 @@
 
     window.addShop = async () => {
         const name = document.getElementById('newName').value, file = document.getElementById('newFile').files[0];
-        if (!name || !file) return alert("請填寫名稱並上傳菜單圖片");
+        if (!name || !file) return alert("請填寫名稱並選擇圖片");
         document.getElementById('addBtn').disabled = true;
         document.getElementById('loadingHint').style.display = 'block';
         try {
@@ -161,7 +173,7 @@
             document.getElementById('newName').value = ""; 
             document.getElementById('newFile').value = "";
             document.getElementById('newNote').value = "電話：\n時間：\n公休：";
-        } catch (e) { alert("讀取圖片出錯，可能文件過大"); }
+        } catch (e) { alert("讀取圖片出錯"); }
         document.getElementById('addBtn').disabled = false;
         document.getElementById('loadingHint').style.display = 'none';
     };
@@ -185,11 +197,11 @@
     window.closeEdit = () => { document.getElementById('editModal').style.display = 'none'; };
 
     window.toggleShop = (id) => { const s = db.find(x => x.id === id); s.visible = !s.visible; save(); };
-    window.delShop = (id) => { if(confirm("確定刪除這間餐廳嗎？")) { db = db.filter(s => s.id !== id); save(); } };
+    window.delShop = (id) => { if(confirm("確定刪除嗎？")) { db = db.filter(s => s.id !== id); save(); } };
     window.toggleDone = (sId, idx) => { db.find(s => s.id === sId).details[idx].isDone = !db.find(s => s.id === sId).details[idx].isDone; save(); };
     window.delDetail = (sId, idx) => { db.find(s => s.id === sId).details.splice(idx, 1); save(); };
     window.openLightbox = (src) => { document.getElementById('boxImg').src = src; document.getElementById('lightbox').style.display = 'flex'; };
-    window.resetAllOrders = () => { if(confirm("確定清空所有點餐紀錄嗎？")) { db.forEach(s => s.details = []); save(); } };
+    window.resetAllOrders = () => { if(confirm("清空紀錄？")) { db.forEach(s => s.details = []); save(); } };
 
     function renderViewPage() {
         const list = document.getElementById('activeOrdersList');
@@ -221,19 +233,26 @@
         });
     }
 
-    function renderAdminGrid() {
-        document.getElementById('historyGrid').innerHTML = db.map(s => `
+    // --- 關鍵修改：具備搜尋與篩選邏輯的 Grid 渲染 ---
+    window.renderAdminGrid = () => {
+        const kw = document.getElementById('adminSearch').value.toLowerCase();
+        const ft = document.getElementById('adminFilter').value;
+        const filtered = db.filter(s => 
+            s.name.toLowerCase().includes(kw) && (ft === '全部' || s.category === ft)
+        );
+
+        document.getElementById('historyGrid').innerHTML = filtered.map(s => `
             <div class="history-card ${s.visible ? 'is-active' : ''}">
                 <img src="${s.image}" onclick="toggleShop(${s.id})">
                 <div style="padding:10px; text-align:center;">
-                    <div style="font-weight:bold;margin-bottom:5px;">${s.name}</div>
+                    <div style="font-weight:bold;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.name}</div>
                     <div style="display:flex; gap:5px; justify-content:center;">
                         <button class="btn btn-edit" onclick="openEdit(${s.id})">編輯</button>
                         <button class="btn btn-danger" style="padding:5px;font-size:12px;" onclick="delShop(${s.id})">刪除</button>
                     </div>
                 </div>
             </div>`).join('');
-    }
+    };
 
     function renderSummaryPage() {
         const active = db.filter(s => s.visible && s.details?.length);
@@ -245,12 +264,11 @@
         }).join('') || "<div style='text-align:center;padding:50px;color:#999;'>尚無點餐數據</div>";
     }
 
-    // --- 修改後的無壓縮圖片處理函數 ---
     function processImageRaw(file) {
         return new Promise((res, rej) => {
             const reader = new FileReader();
             reader.readAsDataURL(file);
-            reader.onload = e => res(e.target.result); // 直接返回原始 Base64
+            reader.onload = e => res(e.target.result);
             reader.onerror = err => rej(err);
         });
     }
