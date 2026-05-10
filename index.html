@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>訂單管理系統 V23.3 - 恢復編輯功能</title>
+    <title>訂單管理系統 V23.4 - 格式化備註</title>
     <style>
         :root { --primary: #4a90e2; --secondary: #34495e; --bg: #f5f7fa; --danger: #ff4d4f; --edit: #f39c12; }
         body { font-family: "Microsoft JhengHei", sans-serif; background: var(--bg); margin: 0; padding: 0; color: #333; }
@@ -15,7 +15,7 @@
         .page.active { display: block; }
         .shop-order-card { background: white; border-radius: 16px; padding: 20px; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
         .shop-title { font-size: 22px; font-weight: bold; color: var(--secondary); margin-bottom: 5px; border-left: 5px solid var(--primary); padding-left: 15px; }
-        .shop-note-display { font-size: 14px; color: #555; margin-bottom: 15px; padding: 12px; background: #fdf6ec; border-radius: 8px; white-space: pre-line; line-height: 1.6; }
+        .shop-note-display { font-size: 14px; color: #555; margin-bottom: 15px; padding: 12px; background: #fdf6ec; border-radius: 8px; white-space: pre-line; line-height: 1.6; border-left: 3px solid #f39c12; }
         .image-frame { width: 100%; height: 350px; border-radius: 12px; margin-bottom: 15px; background: #f9f9f9; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: zoom-in; border: 1px solid #eee; }
         .image-frame img { max-width: 100%; max-height: 100%; object-fit: contain; }
         .admin-controls { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #e2e8f0; }
@@ -30,7 +30,6 @@
         .btn-edit { background: var(--edit); color: white; font-size: 12px; padding: 5px; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { padding: 10px; border-bottom: 1px solid #eee; text-align: center; }
-        /* 編輯彈窗樣式 */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 400px; }
         #lightbox { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); justify-content:center; align-items:center; z-index:1100; }
@@ -63,7 +62,7 @@
                 <option value="飲料">🥤 飲料</option>
                 <option value="甜品">🍰 甜品</option>
             </select>
-            <textarea id="newNote" style="margin-bottom:10px; height:60px;" placeholder="備註 (電話/營業時間)..."></textarea>
+            <textarea id="newNote" style="margin-bottom:10px; height:100px;" placeholder="備註資訊">電話：&#10;時間：&#10;公休：</textarea>
             <input type="file" id="newFile" accept="image/*" style="margin-bottom:10px;">
             <button id="addBtn" class="btn btn-primary" style="width:100%;" onclick="addShop()">儲存並同步</button>
             <p id="loadingHint" style="display:none; color: var(--primary); text-align:center;">正在處理圖片...</p>
@@ -86,7 +85,7 @@
         <label>名稱：</label>
         <input type="text" id="editName" style="margin-bottom: 15px;">
         <label>備註：</label>
-        <textarea id="editNote" style="margin-bottom: 20px; height: 100px;"></textarea>
+        <textarea id="editNote" style="margin-bottom: 20px; height: 120px;"></textarea>
         <div style="display: flex; gap: 10px;">
             <button class="btn btn-primary" style="flex:1" onclick="saveEdit()">儲存</button>
             <button class="btn" style="flex:1; background:#ccc" onclick="closeEdit()">取消</button>
@@ -136,7 +135,6 @@
         if(pageId === 'page-summary') renderSummaryPage();
     };
 
-    // 點餐
     window.addDetail = (id) => {
         const pI = document.getElementById(`p-${id}`), iI = document.getElementById(`i-${id}`), mI = document.getElementById(`m-${id}`);
         const p = pI.value.trim(), i = iI.value.trim(), m = mI.value.trim();
@@ -148,28 +146,29 @@
         iI.value = ""; mI.value = ""; iI.focus();
     };
 
-    // 新增餐廳
     window.addShop = async () => {
         const name = document.getElementById('newName').value, file = document.getElementById('newFile').files[0];
-        if (!name || !file) return alert("請填寫名稱並選擇菜單圖片");
+        if (!name || !file) return alert("請填寫名稱並上傳菜單圖片");
         document.getElementById('addBtn').disabled = true;
         document.getElementById('loadingHint').style.display = 'block';
         try {
             const imgData = await processImage(file);
             db.unshift({ id: Date.now(), name, category: document.getElementById('newCategory').value, note: document.getElementById('newNote').value, image: imgData, details: [], visible: false });
             save();
-            document.getElementById('newName').value = ""; document.getElementById('newFile').value = "";
+            document.getElementById('newName').value = ""; 
+            document.getElementById('newFile').value = "";
+            document.getElementById('newNote').value = "電話：\n時間：\n公休："; // 重置為預設格式
         } catch (e) { alert("圖片處理出錯"); }
         document.getElementById('addBtn').disabled = false;
         document.getElementById('loadingHint').style.display = 'none';
     };
 
-    // 編輯功能
     window.openEdit = (id) => {
         curEditId = id;
         const s = db.find(x => x.id === id);
         document.getElementById('editName').value = s.name;
-        document.getElementById('editNote').value = s.note || "";
+        // 如果原本沒備註，也預填格式
+        document.getElementById('editNote').value = s.note || "電話：\n時間：\n公休：";
         document.getElementById('editModal').style.display = 'flex';
     };
     window.saveEdit = () => {
