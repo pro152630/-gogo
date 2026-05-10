@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>訂單管理系統 V23.6 - 搜尋與篩選版</title>
+    <title>訂單管理系統 V23.7 - 備註優化版</title>
     <style>
         :root { --primary: #4a90e2; --secondary: #34495e; --bg: #f5f7fa; --danger: #ff4d4f; --edit: #f39c12; }
         body { font-family: "Microsoft JhengHei", sans-serif; background: var(--bg); margin: 0; padding: 0; color: #333; }
@@ -18,19 +18,31 @@
         .shop-note-display { font-size: 14px; color: #555; margin-bottom: 15px; padding: 12px; background: #fdf6ec; border-radius: 8px; white-space: pre-line; line-height: 1.6; border-left: 3px solid #f39c12; }
         .image-frame { width: 100%; height: auto; min-height: 200px; max-height: 600px; border-radius: 12px; margin-bottom: 15px; background: #f9f9f9; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: zoom-in; border: 1px solid #eee; }
         .image-frame img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        
+        /* 輸入區佈局優化 */
+        .order-input-group { background: #f8fafc; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #edf2f7; }
+        .input-row { display: flex; gap: 8px; margin-bottom: 8px; }
+        
+        /* 餐點欄位可調大小 */
+        .resizable-item { resize: vertical; min-height: 45px; height: 45px; font-family: inherit; }
+
         .admin-controls { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #e2e8f0; }
         .search-box { display: flex; gap: 10px; margin-bottom: 15px; background: #ebf2f9; padding: 15px; border-radius: 10px; }
         .history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; margin-top: 20px; }
         .history-card { border: 2px solid #e2e8f0; border-radius: 10px; overflow: hidden; background: #fff; position: relative; opacity: 0.6; filter: grayscale(100%); transition: 0.3s; }
         .history-card.is-active { opacity: 1; filter: grayscale(0%); border-color: var(--primary); box-shadow: 0 4px 10px rgba(74,144,226,0.15); }
         .history-card img { width: 100%; height: 100px; object-fit: cover; cursor: pointer; }
+        
         input, textarea, select { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; width: 100%; box-sizing: border-box; }
         .btn { border: none; border-radius: 6px; padding: 10px 15px; cursor: pointer; font-weight: bold; }
         .btn-primary { background: var(--primary); color: white; }
         .btn-danger { background: var(--danger); color: white; }
         .btn-edit { background: var(--edit); color: white; font-size: 12px; padding: 5px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { padding: 10px; border-bottom: 1px solid #eee; text-align: center; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
+        th, td { padding: 10px 5px; border-bottom: 1px solid #eee; text-align: center; font-size: 14px; word-break: break-all; }
+        th { background: #f1f5f9; color: #64748b; font-size: 12px; }
+        
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 400px; }
         #lightbox { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); justify-content:center; align-items:center; z-index:1100; }
@@ -46,7 +58,6 @@
 </div>
 
 <div class="container">
-    <!-- 第一頁 -->
     <div id="page-view" class="page active">
         <div id="activeOrdersList"></div>
         <div id="emptyViewHint" style="text-align:center; color:#999; padding:80px 20px;">
@@ -55,7 +66,6 @@
         </div>
     </div>
 
-    <!-- 第二頁 -->
     <div id="page-admin" class="page">
         <div class="admin-controls">
             <h3>➕ 新增餐廳</h3>
@@ -84,11 +94,9 @@
             </div>
             <button class="btn btn-danger" style="width:100%; background:#666;" onclick="resetAllOrders()">🧹 清除今日所有點餐紀錄</button>
         </div>
-        
         <div class="history-grid" id="historyGrid"></div>
     </div>
 
-    <!-- 第三頁 -->
     <div id="page-summary" class="page">
         <div id="summaryContent"></div>
     </div>
@@ -151,14 +159,21 @@
     };
 
     window.addDetail = (id) => {
-        const pI = document.getElementById(`p-${id}`), iI = document.getElementById(`i-${id}`), mI = document.getElementById(`m-${id}`);
-        const p = pI.value.trim(), i = iI.value.trim(), m = mI.value.trim();
-        if(!p || !i || !m) return alert("請填寫完整資訊");
+        const pI = document.getElementById(`p-${id}`), 
+              iI = document.getElementById(`i-${id}`), 
+              mI = document.getElementById(`m-${id}`),
+              nI = document.getElementById(`n-${id}`);
+        
+        const p = pI.value.trim(), i = iI.value.trim(), m = mI.value.trim(), n = nI.value.trim();
+        if(!p || !i || !m) return alert("請填寫姓名、餐點與金額");
+        
         const sIdx = db.findIndex(s => s.id === id);
         if(!db[sIdx].details) db[sIdx].details = [];
-        db[sIdx].details.push({ person: p, item: i, money: Number(m), isDone: false });
+        db[sIdx].details.push({ person: p, item: i, money: Number(m), note: n, isDone: false });
         save();
-        iI.value = ""; mI.value = ""; iI.focus();
+        
+        iI.value = ""; mI.value = ""; nI.value = "";
+        iI.focus();
     };
 
     window.addShop = async () => {
@@ -216,24 +231,53 @@
                 <div class="shop-title">${shop.name}</div>
                 <div class="shop-note-display">${shop.note || ''}</div>
                 <div class="image-frame" onclick="openLightbox('${shop.image}')"><img src="${shop.image}"></div>
-                <div style="display:flex; gap:5px; margin-bottom:10px;">
-                    <input type="text" id="p-${shop.id}" placeholder="姓名" style="flex:1">
-                    <input type="text" id="i-${shop.id}" placeholder="餐點" style="flex:1.5">
-                    <input type="number" id="m-${shop.id}" placeholder="$" style="flex:0.8">
-                    <button class="btn btn-primary" onclick="addDetail(${shop.id})">加入</button>
+                
+                <div class="order-input-group">
+                    <div class="input-row">
+                        <input type="text" id="p-${shop.id}" placeholder="姓名" style="flex:1">
+                        <input type="number" id="m-${shop.id}" placeholder="金額" style="flex:0.8">
+                        <button class="btn btn-primary" style="flex:0.7" onclick="addDetail(${shop.id})">加入</button>
+                    </div>
+                    <div class="input-row">
+                        <textarea id="i-${shop.id}" class="resizable-item" placeholder="餐點名稱 (可自行拉長)" style="flex:1.5"></textarea>
+                        <input type="text" id="n-${shop.id}" placeholder="備註 (去冰/不蔥)" style="flex:1">
+                    </div>
                 </div>
+
                 <table>
-                    ${details.map((d, x) => `<tr style="${d.isDone?'text-decoration:line-through;color:#aaa':''}">
-                        <td><input type="checkbox" ${d.isDone?'checked':''} onchange="toggleDone(${shop.id},${x})"></td>
-                        <td>${d.person}</td><td>${d.item}</td><td>${d.money}</td>
-                        <td><button onclick="delDetail(${shop.id},${x})" style="border:none;background:none;color:red;cursor:pointer;">✕</button></td></tr>`).join('')}
-                    <tr><td colspan="3" style="text-align:right;font-weight:bold;">總計</td><td style="color:red;font-weight:bold">$${total}</td><td></td></tr>
+                    <thead>
+                        <tr>
+                            <th style="width:35px;">勾</th>
+                            <th style="width:60px;">姓名</th>
+                            <th>餐點</th>
+                            <th style="width:50px;">$</th>
+                            <th style="width:80px;">備註</th>
+                            <th style="width:30px;">✕</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${details.map((d, x) => `
+                        <tr style="${d.isDone?'text-decoration:line-through;color:#aaa':''}">
+                            <td><input type="checkbox" ${d.isDone?'checked':''} onchange="toggleDone(${shop.id},${x})"></td>
+                            <td>${d.person}</td>
+                            <td style="text-align:left;">${d.item}</td>
+                            <td style="font-weight:bold;color:#e67e22;">${d.money}</td>
+                            <td style="font-size:12px;color:#777;">${d.note || ''}</td>
+                            <td><button onclick="delDetail(${shop.id},${x})" style="border:none;background:none;color:red;cursor:pointer;">✕</button></td>
+                        </tr>`).join('')}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="3" style="text-align:right;font-weight:bold;padding-right:10px;">總計</td>
+                            <td style="color:red;font-weight:bold">$${total}</td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tfoot>
                 </table>`;
             list.appendChild(div);
         });
     }
 
-    // --- 關鍵修改：具備搜尋與篩選邏輯的 Grid 渲染 ---
     window.renderAdminGrid = () => {
         const kw = document.getElementById('adminSearch').value.toLowerCase();
         const ft = document.getElementById('adminFilter').value;
@@ -258,7 +302,10 @@
         const active = db.filter(s => s.visible && s.details?.length);
         document.getElementById('summaryContent').innerHTML = active.map(shop => {
             const counts = {};
-            shop.details.forEach(d => counts[d.item] = (counts[d.item] || 0) + 1);
+            shop.details.forEach(d => {
+                const key = d.item + (d.note ? ` (${d.note})` : '');
+                counts[key] = (counts[key] || 0) + 1;
+            });
             return `<div class="shop-order-card"><h3>${shop.name} 統計</h3>
                 ${Object.entries(counts).map(([k, v]) => `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed #eee;"><span>${k}</span><b>${v} 份</b></div>`).join('')}</div>`;
         }).join('') || "<div style='text-align:center;padding:50px;color:#999;'>尚無點餐數據</div>";
