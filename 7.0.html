@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>訂單管理系統 V23.1 - 雲端同步版</title>
+    <style>
+        :root { --primary: #4a90e2; --secondary: #34495e; --bg: #f5f7fa; --danger: #ff4d4f; --edit: #f39c12; --success: #27ae60; }
+        body { font-family: "Microsoft JhengHei", sans-serif; background: var(--bg); margin: 0; padding: 0; color: #333; }
+        .tab-bar { display: flex; background: var(--secondary); position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .tab-btn { flex: 1; padding: 15px; border: none; background: none; color: #adb5bd; cursor: pointer; font-weight: bold; }
+        .tab-btn.active { color: white; border-bottom: 4px solid var(--primary); background: rgba(255,255,255,0.1); }
+        .container { max-width: 900px; margin: 20px auto; padding: 0 15px; min-height: 100vh; }
+        .page { display: none; }
+        .page.active { display: block; }
+        .shop-order-card { background: white; border-radius: 16px; padding: 20px; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
+        .shop-title { font-size: 22px; font-weight: bold; color: var(--secondary); margin-bottom: 5px; border-left: 5px solid var(--primary); padding-left: 15px; }
+        .shop-tag { font-size: 12px; background: #e0e7ff; color: #4338ca; padding: 2px 8px; border-radius: 4px; margin-left: 10px; vertical-align: middle; }
+        .shop-note-display { font-size: 14px; color: #555; margin-bottom: 15px; padding: 12px; background: #fdf6ec; border-radius: 8px; white-space: pre-line; line-height: 1.6; }
+        .image-frame { width: 100%; height: 350px; border-radius: 12px; margin-bottom: 15px; background: #f9f9f9; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: zoom-in; border: 1px solid #eee; }
+        .image-frame img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .admin-controls { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #e2e8f0; }
+        .search-bar { display: flex; gap: 10px; margin-bottom: 15px; }
+        .history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; margin-top: 20px; }
+        .history-card { border: 2px solid #e2e8f0; border-radius: 10px; overflow: hidden; background: #fff; position: relative; opacity: 0.6; filter: grayscale(100%); transition: 0.3s; }
+        .history-card.is-active { opacity: 1; filter: grayscale(0%); border-color: var(--primary); box-shadow: 0 4px 10px rgba(74,144,226,0.15); }
+        .history-card img { width: 100%; height: 100px; object-fit: cover; cursor: pointer; }
+        input, textarea, select { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; width: 100%; box-sizing: border-box; }
+        .btn { border: none; border-radius: 6px; padding: 10px 15px; cursor: pointer; font-weight: bold; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-edit { background: var(--edit); color: white; }
+        .table-container { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 600px; }
+        th, td { padding: 10px; border-bottom: 1px solid #eee; text-align: center; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 400px; }
+        #lightbox { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); justify-content:center; align-items:center; z-index:1100; }
+        #lightbox img { max-width: 95%; max-height: 95%; }
+    </style>
+</head>
+<body>
+
+<div class="tab-bar">
+    <button class="tab-btn active" onclick="switchPage('page-view')">📋 今日點餐</button>
+    <button class="tab-btn" onclick="switchPage('page-admin')">⚙️ 餐廳管理</button>
+    <button class="tab-btn" onclick="switchPage('page-summary')">📊 數量統計</button>
+</div>
+
+<div class="container">
+    <!-- 點餐頁 -->
+    <div id="page-view" class="page active">
+        <div id="activeOrdersList"></div>
+        <div id="emptyViewHint" style="text-align:center; color:#999; padding:80px 20px; background:white; border-radius:16px; border:2px dashed #ccc; margin-top:20px;">
+            <h3>🍴 今日尚未挑選餐廳</h3>
+            <p>請前往「餐廳管理」頁面勾選。</p>
+        </div>
+    </div>
+
+    <!-- 管理頁 -->
+    <div id="page-admin" class="page">
+        <div class="admin-controls">
+            <h3>➕ 新增餐廳</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                <input type="text" id="newName" placeholder="餐廳名稱">
+                <select id="newCategory">
+                    <option value="主食">🍱 主食</option>
+                    <option value="飲料">🥤 飲料</option>
+                    <option value="甜品">🍰 甜品</option>
+                </select>
+            </div>
+            <textarea id="newNote" style="margin-bottom:10px; height:90px;">電話：&#10;營業時間：&#10;公休日：</textarea>
+            <input type="file" id="newFile" accept="image/*" style="margin-bottom:15px;">
+            <button id="addBtn" class="btn btn-primary" style="width:100%;" onclick="addShop()">儲存餐廳</button>
+            <p id="loadingHint" style="display:none; color: var(--primary); text-align:center; font-weight:bold; margin-top:10px;">正在處理圖片並同步至雲端...</p>
+        </div>
+
+        <div class="admin-controls">
+            <h3>🔍 搜尋與篩選</h3>
+            <div class="search-bar">
+                <input type="text" id="adminSearch" placeholder="搜尋餐廳名稱..." oninput="renderAdminGrid()">
+                <select id="adminFilter" style="width: 120px;" onchange="renderAdminGrid()">
+                    <option value="全部">全部類型</option>
+                    <option value="主食">🍱 主食</option>
+                    <option value="甜品">🍰 甜品</option>
+                    <option value="飲料">🥤 飲料</option>
+                </select>
+            </div>
+            <button class="btn btn-danger" style="width:100%; background:#666;" onclick="resetAllOrders()">🧹 清除今日所有點餐紀錄</button>
+        </div>
+        <div class="history-grid" id="historyGrid"></div>
+    </div>
+
+    <!-- 統計頁 -->
+    <div id="page-summary" class="page">
+        <div id="summaryContent"></div>
+    </div>
+</div>
+
+<!-- 修改彈窗 -->
+<div id="editModal" class="modal">
+    <div class="modal-content">
+        <h3>📝 修改餐廳</h3>
+        <input type="text" id="editName" style="margin-bottom: 10px;">
+        <select id="editCategory" style="margin-bottom: 10px;">
+            <option value="主食">🍱 主食</option>
+            <option value="甜品">🍰 甜品</option>
+            <option value="飲料">🥤 飲料</option>
+        </select>
+        <textarea id="editNote" style="margin-bottom: 20px; height: 100px;"></textarea>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-primary" style="flex:1" onclick="saveEdit()">完成</button>
+            <button class="btn" style="flex:1; background:#ccc" onclick="closeEdit()">取消</button>
+        </div>
+    </div>
+</div>
+
+<div id="lightbox" onclick="this.style.display='none'"><img id="boxImg" src=""></div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyDvyMOFN_SkG7akkuoCH59EThRy0hJHDs4",
+        authDomain: "gogo-d01d2.firebaseapp.com",
+        databaseURL: "https://gogo-d01d2-default-rtdb.firebaseio.com",
+        projectId: "gogo-d01d2",
+        storageBucket: "gogo-d01d2.firebasestorage.app",
+        messagingSenderId: "964957638713",
+        appId: "1:964957638713:web:992232106543c5f10d3de8",
+        measurementId: "G-5TMLTVRSGC"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const database = getDatabase(app);
+    const dbRef = ref(database, 'orderSystem_V23');
+
+    let db = [];
+    let editingId = null;
+    const DEFAULT_NOTE = "電話：\n營業時間：\n公休日：";
+
+    // 監聽雲端數據
+    onValue(dbRef, (snapshot) => {
+        db = snapshot.val() || [];
+        renderViewPage();
+        renderAdminGrid();
+        if(document.getElementById('page-summary').classList.contains('active')) renderSummaryPage();
+    });
+
+    function save() { set(dbRef, db); }
+
+    window.switchPage = (pageId) => {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(pageId).classList.add('active');
+        if(pageId === 'page-view') renderViewPage();
+        if(pageId === 'page-summary') renderSummaryPage();
+        if (window.event) window.event.currentTarget.classList.add('active');
+    };
+
+    window.addShop = async () => {
+        const name = document.getElementById('newName').value;
+        const file = document.getElementById('newFile').files[0];
+        if (!name || !file) return alert("請填寫名稱與圖片");
+        document.getElementById('addBtn').disabled = true;
+        document.getElementById('loadingHint').style.display = 'block';
+        try {
+            const imgData = await processImage(file);
+            db.unshift({ id: Date.now(), name, category: document.getElementById('newCategory').value, note: document.getElementById('newNote').value, image: imgData, details: [], visible: false });
+            save();
+            document.getElementById('newName').value = ""; document.getElementById('newFile').value = "";
+            alert("同步成功！");
+        } catch (e) { alert("失敗"); }
+        document.getElementById('addBtn').disabled = false;
+        document.getElementById('loadingHint').style.display = 'none';
+    };
+
+    window.addDetail = (id) => {
+        const p = document.getElementById(`p-${id}`).value, i = document.getElementById(`i-${id}`).value, m = document.getElementById(`m-${id}`).value, n = document.getElementById(`n-${id}`).value;
+        if(!p || !i || !m) return alert("資訊不全");
+        const shop = db.find(s => s.id === id);
+        if(!shop.details) shop.details = [];
+        shop.details.push({person:p, item:i, money:Number(m), userNote:n, isDone:false});
+        save();
+    };
+
+    window.toggleShop = (id) => { const s = db.find(x => x.id === id); s.visible = !s.visible; save(); };
+    window.delShop = (id) => { if(confirm("確定刪除？")) { db = db.filter(s => s.id !== id); save(); } };
+    window.openEdit = (id) => { editingId = id; const s = db.find(x => x.id === id); document.getElementById('editName').value = s.name; document.getElementById('editCategory').value = s.category; document.getElementById('editNote').value = s.note; document.getElementById('editModal').style.display = 'flex'; };
+    window.saveEdit = () => { const s = db.find(x => x.id === editingId); s.name = document.getElementById('editName').value; s.category = document.getElementById('editCategory').value; s.note = document.getElementById('editNote').value; save(); closeEdit(); };
+    window.closeEdit = () => document.getElementById('editModal').style.display = 'none';
+    window.resetAllOrders = () => { if(confirm("清空所有人紀錄？")) { db.forEach(s => s.details = []); save(); } };
+    window.toggleDone = (sId, idx) => { db.find(s => s.id === sId).details[idx].isDone = !db.find(s => s.id === sId).details[idx].isDone; save(); };
+    window.delDetail = (sId, idx) => { db.find(s => s.id === sId).details.splice(idx,1); save(); };
+    window.openLightbox = (src) => { document.getElementById('boxImg').src = src; document.getElementById('lightbox').style.display = 'flex'; };
+
+    function renderAdminGrid() {
+        const kw = document.getElementById('adminSearch').value.toLowerCase();
+        const ft = document.getElementById('adminFilter').value;
+        const filtered = db.filter(s => s.name.toLowerCase().includes(kw) && (ft === '全部' || s.category === ft));
+        document.getElementById('historyGrid').innerHTML = filtered.map(s => `
+            <div class="history-card ${s.visible?'is-active':''}">
+                <img src="${s.image}" onclick="toggleShop(${s.id})">
+                <div style="padding:10px; text-align:center;">
+                    <div style="font-weight:bold;">${s.name}</div>
+                    <button class="btn btn-edit" onclick="openEdit(${s.id})">📝</button>
+                    <button class="btn btn-danger" onclick="delShop(${s.id})">🗑️</button>
+                </div>
+            </div>`).join('');
+    }
+
+    function renderViewPage() {
+        const list = document.getElementById('activeOrdersList');
+        const active = db.filter(s => s.visible);
+        list.innerHTML = "";
+        document.getElementById('emptyViewHint').style.display = active.length ? 'none' : 'block';
+        active.forEach(shop => {
+            const details = shop.details || [];
+            const total = details.reduce((sum, d) => sum + Number(d.money), 0);
+            const div = document.createElement('div');
+            div.className = 'shop-order-card';
+            div.innerHTML = `
+                <div class="shop-title">${shop.name} <span class="shop-tag">${shop.category}</span></div>
+                <div class="shop-note-display">${shop.note}</div>
+                <div class="image-frame" onclick="openLightbox('${shop.image}')"><img src="${shop.image}"></div>
+                <div style="display:flex; gap:5px; margin-bottom:10px;">
+                    <input type="text" id="p-${shop.id}" placeholder="姓名" style="flex:1">
+                    <input type="text" id="i-${shop.id}" placeholder="餐點" style="flex:1.5">
+                    <input type="number" id="m-${shop.id}" placeholder="$" style="flex:0.8">
+                    <button class="btn btn-primary" onclick="addDetail(${shop.id})">加入</button>
+                </div>
+                <table>
+                    <thead><tr><th>付</th><th>姓名</th><th>餐點</th><th>$</th><th>✕</th></tr></thead>
+                    <tbody>${details.map((d, x) => `<tr style="${d.isDone?'text-decoration:line-through;color:#aaa':''}">
+                        <td><input type="checkbox" ${d.isDone?'checked':''} onchange="toggleDone(${shop.id},${x})"></td>
+                        <td>${d.person}</td><td>${d.item}</td><td>${d.money}</td>
+                        <td><button onclick="delDetail(${shop.id},${x})">✕</button></td></tr>`).join('')}
+                    </tbody>
+                    <tfoot><tr><td colspan="3">總計</td><td>$${total}</td><td></td></tr></tfoot>
+                </table>`;
+            list.appendChild(div);
+        });
+    }
+
+    function renderSummaryPage() {
+        const active = db.filter(s => s.visible && s.details && s.details.length);
+        document.getElementById('summaryContent').innerHTML = active.map(shop => {
+            const counts = {};
+            shop.details.forEach(d => { counts[d.item] = (counts[d.item] || 0) + 1; });
+            return `<div class="shop-order-card"><h3>${shop.name} 統計</h3>
+                ${Object.entries(counts).map(([k,v]) => `<p>${k}: <b>${v} 份</b></p>`).join('')}</div>`;
+        }).join('') || "目前無點餐數據";
+    }
+
+    function processImage(file) {
+        return new Promise(res => {
+            const reader = new FileReader(); reader.readAsDataURL(file);
+            reader.onload = e => {
+                const img = new Image(); img.src = e.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = 800; canvas.height = 800 * (img.height/img.width);
+                    ctx.drawImage(img, 0,0, canvas.width, canvas.height);
+                    res(canvas.toDataURL('image/jpeg', 0.6));
+                };
+            };
+        });
+    }
+</script>
+</body>
+</html>
