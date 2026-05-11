@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>訂單管理系統 - 穩定極速版</title>
+    <title>訂單管理系統 - 非同步加速版</title>
     <style>
         :root { --primary: #4a90e2; --secondary: #34495e; --bg: #f5f7fa; --danger: #ff4d4f; --edit: #f39c12; --success: #2ecc71; }
         body { font-family: "Microsoft JhengHei", sans-serif; background: var(--bg); margin: 0; padding: 0; color: #333; -webkit-tap-highlight-color: transparent; }
@@ -143,14 +143,20 @@
         renderSummaryPage();
     });
 
-    const sync = async () => {
-        try { await set(dbRef, db); } catch (e) { console.error("Sync Error:", e); }
+    // --- 🛠 修改後的 sync 函數 (非同步寫入) ---
+    const sync = () => {
+        set(dbRef, db).then(() => {
+            console.log("✅ 同步成功");
+        }).catch((e) => {
+            alert("❌ 資料庫寫入失敗！請檢查 Firebase Rules 規則。");
+            console.error("Firebase Sync Error:", e);
+        });
     };
 
-    // --- 極速圖片壓縮 (500px, Quality 0.4) ---
+    // --- 圖片壓縮邏輯 ---
     const processImageSet = (file) => {
         return new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => reject("處理逾時，請換小一點的照片"), 10000);
+            const timeout = setTimeout(() => reject("處理逾時"), 12000);
             const reader = new FileReader();
             reader.readAsDataURL(file);
             reader.onload = (e) => {
@@ -169,10 +175,7 @@
                         return canvas.toDataURL('image/jpeg', quality);
                     };
                     try {
-                        const result = { 
-                            large: getCanvasData(500, 0.4), 
-                            thumb: getCanvasData(120, 0.3) 
-                        };
+                        const result = { large: getCanvasData(500, 0.4), thumb: getCanvasData(120, 0.3) };
                         clearTimeout(timeout);
                         resolve(result);
                     } catch (err) {
@@ -191,7 +194,7 @@
         if (event) event.currentTarget.classList.add('active');
     };
 
-    // --- 優化後的新增邏輯 (保證恢復 UI) ---
+    // --- 🛠 修改後的 addShop 邏輯片段 ---
     window.addShop = async () => {
         const n = document.getElementById('newName').value;
         const f = document.getElementById('newFile').files[0];
@@ -200,7 +203,6 @@
 
         if (!n || !f) return alert("請填寫名稱並選擇照片");
 
-        // UI 鎖定
         btn.disabled = true;
         btn.innerText = "⚡ 處理中...";
         hint.style.display = 'block';
@@ -217,21 +219,23 @@
                 details: [], 
                 visible: false 
             };
+
+            // 更新本地資料並發送同步，不使用 await 等待
             db.unshift(newShop);
-            await sync();
-            
-            // 成功後清空欄位
+            sync(); 
+
+            // 立即恢復 UI，不讓使用者卡在處理中畫面
             document.getElementById('newName').value = ""; 
             document.getElementById('newFile').value = "";
-            alert("✅ 新增成功！");
+            renderAdminGrid(); // 立即重新繪製列表顯示新餐廳
+            
+            alert("✅ 新增成功！資料正在上傳中...");
         } catch (error) {
             alert("❌ 失敗：" + error);
         } finally {
-            // 無論如何都恢復按鈕
             btn.disabled = false;
             btn.innerText = "確認新增";
             hint.style.display = 'none';
-            renderAdminGrid(); // 強制重繪列表
         }
     };
 
@@ -311,7 +315,7 @@
     function renderSummaryPage() {
         const active = db.filter(s => s.visible && s.details?.length);
         if (!active.length) {
-            document.getElementById('summaryContent').innerHTML = '<div style="text-align:center; padding:50px; color:#94a3b8;">目前無點餐</div>';
+            document.getElementById('summaryContent').innerHTML = '<div style="text-align:center; padding:50px; color:#94a3b8;">目前無數據</div>';
             return;
         }
         document.getElementById('summaryContent').innerHTML = active.map(s => {
@@ -337,8 +341,8 @@
 
     window.toggleShop = (id) => { const s = db.find(x=>x.id===id); s.visible = !s.visible; sync(); };
     window.toggleOrder = (sId, idx) => { db.find(s=>s.id===sId).details[idx].isDone = !db.find(s=>s.id===sId).details[idx].isDone; sync(); };
-    window.delOrder = (sId, idx) => { if(confirm("刪除？")) { db.find(s=>s.id===sId).details.splice(idx,1); sync(); } };
-    window.delShop = (id) => { if(confirm("永久刪除餐廳？")) { db = db.filter(x=>x.id!==id); sync(); } };
+    window.delOrder = (sId, idx) => { if(confirm("刪除這筆？")) { db.find(s=>s.id===sId).details.splice(idx,1); sync(); } };
+    window.delShop = (id) => { if(confirm("確定永久刪除？")) { db = db.filter(x=>x.id!==id); sync(); } };
     window.openImg = (src) => { document.getElementById('boxImg').src = src; document.getElementById('lightbox').style.display = 'flex'; };
     window.resetAllOrders = () => { if(confirm("確定清空今日紀錄？")) { db.forEach(s=>s.details=[]); sync(); } };
     window.copyText = (txt) => { navigator.clipboard.writeText(txt); alert("複製成功"); };
