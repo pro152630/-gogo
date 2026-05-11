@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>訂單管理系統 - 非同步加速版</title>
+    <title>訂單管理系統 - 高畫質版</title>
     <style>
         :root { --primary: #4a90e2; --secondary: #34495e; --bg: #f5f7fa; --danger: #ff4d4f; --edit: #f39c12; --success: #2ecc71; }
         body { font-family: "Microsoft JhengHei", sans-serif; background: var(--bg); margin: 0; padding: 0; color: #333; -webkit-tap-highlight-color: transparent; }
@@ -19,7 +19,7 @@
         .shop-title::before { content: ""; width: 6px; height: 20px; background: var(--primary); border-radius: 3px; margin-right: 12px; }
         .category-tag { font-size: 11px; background: #e2e8f0; color: #475569; padding: 2px 8px; border-radius: 20px; margin-left: auto; }
         .image-frame { width: 100%; min-height: 100px; border-radius: 12px; margin: 12px 0; background: #f8fafc; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #edf2f7; }
-        .image-frame img { max-width: 100%; height: auto; max-height: 550px; object-fit: contain; cursor: zoom-in; }
+        .image-frame img { max-width: 100%; height: auto; max-height: 800px; object-fit: contain; cursor: zoom-in; }
         .order-input-group { background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 15px; }
         .input-row { display: flex; gap: 8px; margin-bottom: 10px; }
         input, textarea, select { padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 16px !important; transition: 0.2s; width: 100%; box-sizing: border-box; }
@@ -72,7 +72,7 @@
             <textarea id="newNote" style="height:80px; margin-bottom:10px;" placeholder="備註資訊">電話：&#10;時間：&#10;公休:</textarea>
             <input type="file" id="newFile" accept="image/*">
             <button id="addBtn" class="btn btn-primary" style="width:100%; margin-top:15px;" onclick="addShop()">確認新增</button>
-            <div id="loadingHint" style="display:none; color:var(--primary); text-align:center; font-size:14px; margin-top:10px; font-weight:bold;">⚡ 處理中...請勿關閉視窗</div>
+            <div id="loadingHint" style="display:none; color:var(--primary); text-align:center; font-size:14px; margin-top:10px; font-weight:bold;">⚡ 高品質處理中...請稍候</div>
         </div>
 
         <div class="shop-order-card">
@@ -143,52 +143,55 @@
         renderSummaryPage();
     });
 
-    // --- 🛠 修改後的 sync 函數 (非同步寫入) ---
+    // --- 非同步同步函數 ---
     const sync = () => {
         set(dbRef, db).then(() => {
             console.log("✅ 同步成功");
         }).catch((e) => {
-            alert("❌ 資料庫寫入失敗！請檢查 Firebase Rules 規則。");
-            console.error("Firebase Sync Error:", e);
+            alert("❌ 雲端同步失敗，請檢查 Firebase Rules！");
+            console.error(e);
         });
     };
 
-    // --- 圖片壓縮邏輯 ---
+    // --- 圖片處理邏輯 (調整為 1200px 高畫質) ---
     const processImageSet = (file) => {
-    return new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject("處理逾時"), 12000);
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = (e) => {
-            const img = new Image();
-            img.src = e.target.result;
-            img.onload = () => {
-                const getCanvasData = (maxSize, quality) => {
-                    const canvas = document.createElement('canvas');
-                    let w = img.width, h = img.height;
-                    if (w > maxSize) { h *= maxSize / w; w = maxSize; }
-                    canvas.width = w; canvas.height = h;
-                    const ctx = canvas.getContext('2d');
-                    ctx.imageSmoothingEnabled = true;
-                    ctx.imageSmoothingQuality = 'medium'; // 稍微提升平滑度
-                    ctx.drawImage(img, 0, 0, w, h);
-                    return canvas.toDataURL('image/jpeg', quality);
-                };
-                try {
-                    const result = { 
-                        large: getCanvasData(500, 0.4), // 大圖維持 0.4 確保不卡頓
-                        thumb: getCanvasData(120, 0.7)  // 縮圖品質調回 0.7
+        return new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject("處理逾時，請壓縮照片後再試"), 15000);
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (e) => {
+                const img = new Image();
+                img.src = e.target.result;
+                img.onload = () => {
+                    const getCanvasData = (maxSize, quality) => {
+                        const canvas = document.createElement('canvas');
+                        let w = img.width, h = img.height;
+                        if (w > maxSize || h > maxSize) {
+                            if (w > h) { h *= maxSize / w; w = maxSize; }
+                            else { w *= maxSize / h; h = maxSize; }
+                        }
+                        canvas.width = w; canvas.height = h;
+                        const ctx = canvas.getContext('2d');
+                        ctx.imageSmoothingEnabled = true;
+                        ctx.imageSmoothingQuality = 'high';
+                        ctx.drawImage(img, 0, 0, w, h);
+                        return canvas.toDataURL('image/jpeg', quality);
                     };
-                    clearTimeout(timeout);
-                    resolve(result);
-                } catch (err) {
-                    clearTimeout(timeout);
-                    reject("記憶體不足");
-                }
+                    try {
+                        const result = { 
+                            large: getCanvasData(1200, 0.7), // 大圖提高到 1200px, 畫質 0.7
+                            thumb: getCanvasData(150, 0.7)   // 縮圖畫質同步提高
+                        };
+                        clearTimeout(timeout);
+                        resolve(result);
+                    } catch (err) {
+                        clearTimeout(timeout);
+                        reject("記憶體不足，無法處理高畫質照片");
+                    }
+                };
             };
-        };
-    });
-};
+        });
+    };
 
     window.switchPage = (pageId) => {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -197,7 +200,6 @@
         if (event) event.currentTarget.classList.add('active');
     };
 
-    // --- 🛠 修改後的 addShop 邏輯片段 ---
     window.addShop = async () => {
         const n = document.getElementById('newName').value;
         const f = document.getElementById('newFile').files[0];
@@ -207,7 +209,7 @@
         if (!n || !f) return alert("請填寫名稱並選擇照片");
 
         btn.disabled = true;
-        btn.innerText = "⚡ 處理中...";
+        btn.innerText = "⚡ 高畫質處理中...";
         hint.style.display = 'block';
 
         try {
@@ -223,16 +225,14 @@
                 visible: false 
             };
 
-            // 更新本地資料並發送同步，不使用 await 等待
             db.unshift(newShop);
-            sync(); 
+            sync(); // 背景同步
 
-            // 立即恢復 UI，不讓使用者卡在處理中畫面
             document.getElementById('newName').value = ""; 
             document.getElementById('newFile').value = "";
-            renderAdminGrid(); // 立即重新繪製列表顯示新餐廳
+            renderAdminGrid();
             
-            alert("✅ 新增成功！資料正在上傳中...");
+            alert("✅ 新增成功！(高畫質版)");
         } catch (error) {
             alert("❌ 失敗：" + error);
         } finally {
