@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>訂單管理系統 V23.8 - 分類排序版</title>
+    <title>訂單管理系統 V23.8 - 壓縮優化版</title>
     <style>
         :root { --primary: #4a90e2; --secondary: #34495e; --bg: #f5f7fa; --danger: #ff4d4f; --edit: #f39c12; }
         body { font-family: "Microsoft JhengHei", sans-serif; background: var(--bg); margin: 0; padding: 0; color: #333; }
@@ -33,6 +33,7 @@
         
         input, textarea, select { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; width: 100%; box-sizing: border-box; }
         .btn { border: none; border-radius: 6px; padding: 10px 15px; cursor: pointer; font-weight: bold; }
+        .btn:disabled { background: #ccc; cursor: not-allowed; }
         .btn-primary { background: var(--primary); color: white; }
         .btn-danger { background: var(--danger); color: white; }
         .btn-edit { background: var(--edit); color: white; font-size: 12px; padding: 5px; }
@@ -64,7 +65,6 @@
         </div>
     </div>
 
-    <!-- 管理頁面與統計頁面保持不變，略過部分代碼以節省空間但邏輯完整 -->
     <div id="page-admin" class="page">
         <div class="admin-controls">
             <h3>➕ 新增餐廳</h3>
@@ -77,7 +77,7 @@
             <textarea id="newNote" style="margin-bottom:10px; height:100px;" placeholder="備註資訊">電話：&#10;時間：&#10;公休：</textarea>
             <input type="file" id="newFile" accept="image/*" style="margin-bottom:10px;">
             <button id="addBtn" class="btn btn-primary" style="width:100%;" onclick="addShop()">儲存並同步</button>
-            <p id="loadingHint" style="display:none; color: var(--primary); text-align:center;">正在讀取原圖數據...</p>
+            <p id="loadingHint" style="display:none; color: var(--primary); text-align:center; font-weight: bold; margin-top: 10px;">正在壓縮圖片並上傳...</p>
         </div>
 
         <div class="admin-controls">
@@ -144,9 +144,19 @@
         renderViewPage();
         renderAdminGrid();
         if(document.getElementById('page-summary').classList.contains('active')) renderSummaryPage();
+    }, (error) => {
+        console.error("連線資料庫失敗:", error);
+        alert("讀取資料失敗，請檢查網路連線或 Firebase 設定。");
     });
 
-    function save() { set(dbRef, db); }
+    async function save() { 
+        try {
+            await set(dbRef, db);
+        } catch (e) {
+            console.error("儲存失敗:", e);
+            alert("同步失敗！可能是資料量過大或權限問題。建議刪除舊的餐廳。");
+        }
+    }
 
     window.switchPage = (pageId) => {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -158,38 +168,82 @@
     };
 
     window.addDetail = (id) => {
-        const pI = document.getElementById(`p-${id}`), 
-              iI = document.getElementById(`i-${id}`), 
-              mI = document.getElementById(`m-${id}`),
-              nI = document.getElementById(`n-${id}`);
-        
+        const pI = document.getElementById(`p-${id}`), iI = document.getElementById(`i-${id}`), mI = document.getElementById(`m-${id}`), nI = document.getElementById(`n-${id}`);
         const p = pI.value.trim(), i = iI.value.trim(), m = mI.value.trim(), n = nI.value.trim();
         if(!p || !i || !m) return alert("請填寫姓名、餐點與金額");
-        
         const sIdx = db.findIndex(s => s.id === id);
         if(!db[sIdx].details) db[sIdx].details = [];
         db[sIdx].details.push({ person: p, item: i, money: Number(m), note: n, isDone: false });
         save();
-        
         iI.value = ""; mI.value = ""; nI.value = "";
         iI.focus();
     };
 
+    // --- 圖片壓縮優化 (功能 1) ---
+    function compressImage(file) {
+        return new Promise((res, rej) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (e) => {
+                const img = new Image();
+                img.src = e.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    const max_size = 1024; // 最大寬度/高度
+
+                    if (width > height) {
+                        if (width > max_size) { height *= max_size / width; width = max_size; }
+                    } else {
+                        if (height > max_size) { width *= max_size / height; height = max_size; }
+                    }
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    res(canvas.toDataURL('image/jpeg', 0.7)); // 壓縮品質設為 0.7
+                };
+                img.onerror = (err) => rej(err);
+            };
+            reader.onerror = (err) => rej(err);
+        });
+    }
+
+    // --- 新增餐廳時的錯誤處理 (功能 5) ---
     window.addShop = async () => {
         const name = document.getElementById('newName').value, file = document.getElementById('newFile').files[0];
         if (!name || !file) return alert("請填寫名稱並選擇圖片");
+        
         document.getElementById('addBtn').disabled = true;
         document.getElementById('loadingHint').style.display = 'block';
+        
         try {
-            const imgData = await processImageRaw(file);
-            db.unshift({ id: Date.now(), name, category: document.getElementById('newCategory').value, note: document.getElementById('newNote').value, image: imgData, details: [], visible: false });
-            save();
+            const imgData = await compressImage(file);
+            const newShop = { 
+                id: Date.now(), 
+                name, 
+                category: document.getElementById('newCategory').value, 
+                note: document.getElementById('newNote').value, 
+                image: imgData, 
+                details: [], 
+                visible: false 
+            };
+            
+            db.unshift(newShop);
+            await set(dbRef, db); // 使用 await 確保寫入成功
+            
             document.getElementById('newName').value = ""; 
             document.getElementById('newFile').value = "";
             document.getElementById('newNote').value = "電話：\n時間：\n公休：";
-        } catch (e) { alert("讀取圖片出錯"); }
-        document.getElementById('addBtn').disabled = false;
-        document.getElementById('loadingHint').style.display = 'none';
+            alert("新增成功！");
+        } catch (e) { 
+            console.error(e);
+            alert("新增失敗：圖片處理出錯或 Firebase 空間不足。"); 
+        } finally {
+            document.getElementById('addBtn').disabled = false;
+            document.getElementById('loadingHint').style.display = 'none';
+        }
     };
 
     window.openEdit = (id) => {
@@ -217,35 +271,20 @@
     window.openLightbox = (src) => { document.getElementById('boxImg').src = src; document.getElementById('lightbox').style.display = 'flex'; };
     window.resetAllOrders = () => { if(confirm("清空紀錄？")) { db.forEach(s => s.details = []); save(); } };
 
-    // --- 排序邏輯優化 ---
     function renderViewPage() {
         const list = document.getElementById('activeOrdersList');
-        
-        // 設定權重順序
         const categoryOrder = { "主食": 1, "飲料": 2, "甜品": 3 };
-        
-        // 篩選並排序
-        const active = db.filter(s => s.visible).sort((a, b) => {
-            const orderA = categoryOrder[a.category] || 99;
-            const orderB = categoryOrder[b.category] || 99;
-            return orderA - orderB;
-        });
-
+        const active = db.filter(s => s.visible).sort((a, b) => (categoryOrder[a.category] || 99) - (categoryOrder[b.category] || 99));
         list.innerHTML = "";
         document.getElementById('emptyViewHint').style.display = active.length ? 'none' : 'block';
-        
         active.forEach(shop => {
             const details = shop.details || [], total = details.reduce((sum, d) => sum + Number(d.money), 0);
             const div = document.createElement('div');
             div.className = 'shop-order-card';
             div.innerHTML = `
-                <div class="shop-title">
-                    ${shop.name}
-                    <span class="category-tag">${shop.category}</span>
-                </div>
+                <div class="shop-title">${shop.name}<span class="category-tag">${shop.category}</span></div>
                 <div class="shop-note-display">${shop.note || ''}</div>
                 <div class="image-frame" onclick="openLightbox('${shop.image}')"><img src="${shop.image}"></div>
-                
                 <div class="order-input-group">
                     <div class="input-row">
                         <input type="text" id="p-${shop.id}" placeholder="姓名" style="flex:1">
@@ -253,40 +292,19 @@
                         <button class="btn btn-primary" style="flex:0.7" onclick="addDetail(${shop.id})">加入</button>
                     </div>
                     <div class="input-row">
-                        <textarea id="i-${shop.id}" class="resizable-item" placeholder="餐點名稱 (可自行拉長)" style="flex:1.5"></textarea>
-                        <input type="text" id="n-${shop.id}" placeholder="備註 (去冰/不蔥)" style="flex:1">
+                        <textarea id="i-${shop.id}" class="resizable-item" placeholder="餐點名稱" style="flex:1.5"></textarea>
+                        <input type="text" id="n-${shop.id}" placeholder="備註" style="flex:1">
                     </div>
                 </div>
-
                 <table>
-                    <thead>
-                        <tr>
-                            <th style="width:35px;">勾</th>
-                            <th style="width:60px;">姓名</th>
-                            <th>餐點</th>
-                            <th style="width:50px;">$</th>
-                            <th style="width:80px;">備註</th>
-                            <th style="width:30px;">✕</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${details.map((d, x) => `
+                    <thead><tr><th style="width:35px;">勾</th><th style="width:60px;">姓名</th><th>餐點</th><th style="width:50px;">$</th><th style="width:80px;">備註</th><th style="width:30px;">✕</th></tr></thead>
+                    <tbody>${details.map((d, x) => `
                         <tr style="${d.isDone?'text-decoration:line-through;color:#aaa':''}">
                             <td><input type="checkbox" ${d.isDone?'checked':''} onchange="toggleDone(${shop.id},${x})"></td>
-                            <td>${d.person}</td>
-                            <td style="text-align:left;">${d.item}</td>
-                            <td style="font-weight:bold;color:#e67e22;">${d.money}</td>
-                            <td style="font-size:12px;color:#777;">${d.note || ''}</td>
+                            <td>${d.person}</td><td style="text-align:left;">${d.item}</td><td style="font-weight:bold;color:#e67e22;">${d.money}</td><td>${d.note || ''}</td>
                             <td><button onclick="delDetail(${shop.id},${x})" style="border:none;background:none;color:red;cursor:pointer;">✕</button></td>
-                        </tr>`).join('')}
-                    </tbody>
-                    <tfoot>
-                        <tr>
-                            <td colspan="3" style="text-align:right;font-weight:bold;padding-right:10px;">總計</td>
-                            <td style="color:red;font-weight:bold">$${total}</td>
-                            <td colspan="2"></td>
-                        </tr>
-                    </tfoot>
+                        </tr>`).join('')}</tbody>
+                    <tfoot><tr><td colspan="3" style="text-align:right;font-weight:bold;">總計</td><td style="color:red;font-weight:bold">$${total}</td><td colspan="2"></td></tr></tfoot>
                 </table>`;
             list.appendChild(div);
         });
@@ -295,10 +313,7 @@
     window.renderAdminGrid = () => {
         const kw = document.getElementById('adminSearch').value.toLowerCase();
         const ft = document.getElementById('adminFilter').value;
-        const filtered = db.filter(s => 
-            s.name.toLowerCase().includes(kw) && (ft === '全部' || s.category === ft)
-        );
-
+        const filtered = db.filter(s => s.name.toLowerCase().includes(kw) && (ft === '全部' || s.category === ft));
         document.getElementById('historyGrid').innerHTML = filtered.map(s => `
             <div class="history-card ${s.visible ? 'is-active' : ''}">
                 <img src="${s.image}" onclick="toggleShop(${s.id})">
@@ -323,15 +338,6 @@
             return `<div class="shop-order-card"><h3>${shop.name} 統計</h3>
                 ${Object.entries(counts).map(([k, v]) => `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed #eee;"><span>${k}</span><b>${v} 份</b></div>`).join('')}</div>`;
         }).join('') || "<div style='text-align:center;padding:50px;color:#999;'>尚無點餐數據</div>";
-    }
-
-    function processImageRaw(file) {
-        return new Promise((res, rej) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = e => res(e.target.result);
-            reader.onerror = err => rej(err);
-        });
     }
 </script>
 </body>
