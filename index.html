@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>訂單管理系統 - 分類修改版</title>
+    <title>訂單管理系統 - 簡潔版</title>
     <style>
         :root { --primary: #4a90e2; --secondary: #34495e; --bg: #f5f7fa; --danger: #ff4d4f; --edit: #f39c12; --success: #2ecc71; }
         body { font-family: "Microsoft JhengHei", sans-serif; background: var(--bg); margin: 0; padding: 0; color: #333; -webkit-tap-highlight-color: transparent; }
@@ -112,7 +112,7 @@
     </div>
 </div>
 
-<!-- 編輯視窗 (Modal) -->
+<!-- 編輯視窗 -->
 <div id="editModal" class="modal">
     <div class="modal-content">
         <h3>📝 編輯資訊</h3>
@@ -124,7 +124,6 @@
             <option value="主食">🍱 主食</option>
             <option value="飲料">🥤 飲料</option>
             <option value="點心">🍰 點心</option>
-            <option value="甜品">🍰 甜品 (舊版)</option> <!-- 保留舊選項以便轉換 -->
         </select>
         
         <label style="font-size: 12px; color: #666;">備註資訊：</label>
@@ -219,9 +218,7 @@
         const files = document.getElementById('newFile').files;
         const btn = document.getElementById('addBtn');
         if(!n || files.length === 0) return alert("請填寫名稱與圖片");
-        
         btn.disabled = true; document.getElementById('loadingHint').style.display = 'block';
-        
         try {
             const imageList = [];
             for(let f of files) { imageList.push(await compressImage(f)); }
@@ -238,7 +235,7 @@
         const kw = document.getElementById('adminSearch').value.toLowerCase();
         const filtered = db.filter(s => {
             const matchKw = s.name.toLowerCase().includes(kw);
-            // 點擊「點心」篩選時，同時顯示舊有的「甜品」
+            // 兼容邏輯：篩選點心時也顯示舊的甜品
             const matchCat = (currentFilter === '全部' || s.category === currentFilter || (currentFilter === '點心' && s.category === '甜品'));
             return matchKw && matchCat;
         });
@@ -320,14 +317,15 @@
         curId = id; 
         const s = db.find(x=>x.id===id); 
         document.getElementById('editName').value = s.name; 
-        document.getElementById('editCategory').value = s.category; // 自動帶入目前的分類
+        // 如果原本是甜品，自動對應到點心選單
+        document.getElementById('editCategory').value = (s.category === '甜品') ? '點心' : s.category;
         document.getElementById('editNote').value = s.note; 
         document.getElementById('editModal').style.display = 'flex'; 
     };
     window.saveEdit = () => { 
         const s = db.find(x=>x.id===curId); 
         s.name = document.getElementById('editName').value; 
-        s.category = document.getElementById('editCategory').value; // 儲存新選擇的分類
+        s.category = document.getElementById('editCategory').value; 
         s.note = document.getElementById('editNote').value; 
         sync(); 
         closeEdit(); 
