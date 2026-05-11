@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>訂單管理系統 V23.8 - 壓縮優化版</title>
+    <title>訂單管理系統 V24.0 - 效能極致優化版</title>
     <style>
         :root { --primary: #4a90e2; --secondary: #34495e; --bg: #f5f7fa; --danger: #ff4d4f; --edit: #f39c12; }
         body { font-family: "Microsoft JhengHei", sans-serif; background: var(--bg); margin: 0; padding: 0; color: #333; }
@@ -13,27 +13,32 @@
         .container { max-width: 900px; margin: 20px auto; padding: 0 15px; min-height: 100vh; }
         .page { display: none; }
         .page.active { display: block; }
+        
+        /* 餐廳卡片優化 */
         .shop-order-card { background: white; border-radius: 16px; padding: 20px; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
         .shop-title { font-size: 22px; font-weight: bold; color: var(--secondary); margin-bottom: 5px; border-left: 5px solid var(--primary); padding-left: 15px; }
         .category-tag { font-size: 12px; background: #e2e8f0; color: #475569; padding: 2px 8px; border-radius: 4px; margin-left: 10px; vertical-align: middle; }
         .shop-note-display { font-size: 14px; color: #555; margin-bottom: 15px; padding: 12px; background: #fdf6ec; border-radius: 8px; white-space: pre-line; line-height: 1.6; border-left: 3px solid #f39c12; }
-        .image-frame { width: 100%; height: auto; min-height: 200px; max-height: 600px; border-radius: 12px; margin-bottom: 15px; background: #f9f9f9; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: zoom-in; border: 1px solid #eee; }
-        .image-frame img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        
+        /* 圖片容器優化 */
+        .image-frame { width: 100%; min-height: 150px; border-radius: 12px; margin-bottom: 15px; background: #eee; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: zoom-in; border: 1px solid #eee; }
+        .image-frame img { max-width: 100%; max-height: 600px; object-fit: contain; }
         
         .order-input-group { background: #f8fafc; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #edf2f7; }
         .input-row { display: flex; gap: 8px; margin-bottom: 8px; }
-        .resizable-item { resize: vertical; min-height: 45px; height: 45px; font-family: inherit; }
+        .resizable-item { resize: vertical; min-height: 45px; height: 45px; font-family: inherit; font-size: 16px !important; }
 
         .admin-controls { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #e2e8f0; }
-        .search-box { display: flex; gap: 10px; margin-bottom: 15px; background: #ebf2f9; padding: 15px; border-radius: 10px; }
-        .history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; margin-top: 20px; }
-        .history-card { border: 2px solid #e2e8f0; border-radius: 10px; overflow: hidden; background: #fff; position: relative; opacity: 0.6; filter: grayscale(100%); transition: 0.3s; }
-        .history-card.is-active { opacity: 1; filter: grayscale(0%); border-color: var(--primary); box-shadow: 0 4px 10px rgba(74,144,226,0.15); }
-        .history-card img { width: 100%; height: 100px; object-fit: cover; cursor: pointer; }
+        .history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 15px; margin-top: 20px; }
+        .history-card { border: 2px solid #e2e8f0; border-radius: 10px; overflow: hidden; background: #fff; transition: 0.3s; }
+        .history-card.is-active { border-color: var(--primary); box-shadow: 0 4px 10px rgba(74,144,226,0.2); }
         
-        input, textarea, select { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; width: 100%; box-sizing: border-box; }
-        .btn { border: none; border-radius: 6px; padding: 10px 15px; cursor: pointer; font-weight: bold; }
-        .btn:disabled { background: #ccc; cursor: not-allowed; }
+        /* 縮圖佔位符 */
+        .thumb-placeholder { background: #f1f5f9; height: 100px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #94a3b8; font-size: 12px; cursor: pointer; }
+
+        input, textarea, select { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px !important; width: 100%; box-sizing: border-box; }
+        .btn { border: none; border-radius: 6px; padding: 10px 15px; cursor: pointer; font-weight: bold; transition: active 0.1s; }
+        .btn:active { transform: scale(0.98); }
         .btn-primary { background: var(--primary); color: white; }
         .btn-danger { background: var(--danger); color: white; }
         .btn-edit { background: var(--edit); color: white; font-size: 12px; padding: 5px; }
@@ -44,7 +49,7 @@
         
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 400px; }
-        #lightbox { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); justify-content:center; align-items:center; z-index:1100; }
+        #lightbox { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); justify-content:center; align-items:center; z-index:2100; }
         #lightbox img { max-width: 95%; max-height: 95%; }
     </style>
 </head>
@@ -57,14 +62,16 @@
 </div>
 
 <div class="container">
+    <!-- 頁面：今日點餐 -->
     <div id="page-view" class="page active">
         <div id="activeOrdersList"></div>
         <div id="emptyViewHint" style="text-align:center; color:#999; padding:80px 20px;">
             <h3>🍴 今日尚未挑選餐廳</h3>
-            <p>請前往「餐廳管理」頁面點擊圖片來啟用。</p>
+            <p>請前往「餐廳管理」頁面點擊圖示來啟用。</p>
         </div>
     </div>
 
+    <!-- 頁面：餐廳管理 -->
     <div id="page-admin" class="page">
         <div class="admin-controls">
             <h3>➕ 新增餐廳</h3>
@@ -76,16 +83,16 @@
             </select>
             <textarea id="newNote" style="margin-bottom:10px; height:100px;" placeholder="備註資訊">電話：&#10;時間：&#10;公休：</textarea>
             <input type="file" id="newFile" accept="image/*" style="margin-bottom:10px;">
-            <button id="addBtn" class="btn btn-primary" style="width:100%;" onclick="addShop()">儲存並同步</button>
-            <p id="loadingHint" style="display:none; color: var(--primary); text-align:center; font-weight: bold; margin-top: 10px;">正在壓縮圖片並上傳...</p>
+            <button id="addBtn" class="btn btn-primary" style="width:100%;" onclick="addShop()">儲存並上傳</button>
+            <p id="loadingHint" style="display:none; color: var(--primary); text-align:center; font-weight:bold; margin-top:10px;">圖片處理中，請稍候...</p>
         </div>
 
         <div class="admin-controls">
-            <h3>🔍 搜尋與篩選</h3>
-            <div class="search-box">
-                <input type="text" id="adminSearch" placeholder="搜尋餐廳名稱..." oninput="renderAdminGrid()" style="flex:2">
+            <h3>🔍 餐廳列表</h3>
+            <div style="display:flex; gap:10px; margin-bottom:15px;">
+                <input type="text" id="adminSearch" placeholder="搜尋名稱..." oninput="renderAdminGrid()" style="flex:2">
                 <select id="adminFilter" onchange="renderAdminGrid()" style="flex:1">
-                    <option value="全部">全部類型</option>
+                    <option value="全部">全部</option>
                     <option value="主食">🍱 主食</option>
                     <option value="飲料">🥤 飲料</option>
                     <option value="甜品">🍰 甜品</option>
@@ -96,17 +103,17 @@
         <div class="history-grid" id="historyGrid"></div>
     </div>
 
+    <!-- 頁面：數量統計 -->
     <div id="page-summary" class="page">
         <div id="summaryContent"></div>
     </div>
 </div>
 
+<!-- 編輯彈窗 -->
 <div id="editModal" class="modal">
     <div class="modal-content">
-        <h3>📝 修改餐廳資訊</h3>
-        <label>名稱：</label>
+        <h3>📝 修改資訊</h3>
         <input type="text" id="editName" style="margin-bottom: 15px;">
-        <label>備註：</label>
         <textarea id="editNote" style="margin-bottom: 20px; height: 120px;"></textarea>
         <div style="display: flex; gap: 10px;">
             <button class="btn btn-primary" style="flex:1" onclick="saveEdit()">儲存</button>
@@ -115,6 +122,7 @@
     </div>
 </div>
 
+<!-- 燈箱 -->
 <div id="lightbox" onclick="this.style.display='none'"><img id="boxImg" src=""></div>
 
 <script type="module">
@@ -134,54 +142,32 @@
 
     const app = initializeApp(firebaseConfig);
     const database = getDatabase(app);
-    const dbRef = ref(database, 'orderSystem_V23');
+    const dbRef = ref(database, 'orderSystem_V24');
 
     let db = [];
     let curEditId = null;
 
+    // 即時監聽
     onValue(dbRef, (snapshot) => {
         db = snapshot.val() || [];
         renderViewPage();
         renderAdminGrid();
         if(document.getElementById('page-summary').classList.contains('active')) renderSummaryPage();
-    }, (error) => {
-        console.error("連線資料庫失敗:", error);
-        alert("讀取資料失敗，請檢查網路連線或 Firebase 設定。");
     });
 
-    async function save() { 
+    // 儲存至 Firebase (含錯誤提醒)
+    async function saveToFirebase() {
         try {
             await set(dbRef, db);
         } catch (e) {
-            console.error("儲存失敗:", e);
-            alert("同步失敗！可能是資料量過大或權限問題。建議刪除舊的餐廳。");
+            console.error(e);
+            alert("同步失敗！可能是資料量太大，請嘗試刪除不常用的餐廳。");
         }
     }
 
-    window.switchPage = (pageId) => {
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById(pageId).classList.add('active');
-        if (window.event) window.event.currentTarget.classList.add('active');
-        if(pageId === 'page-view') renderViewPage();
-        if(pageId === 'page-summary') renderSummaryPage();
-    };
-
-    window.addDetail = (id) => {
-        const pI = document.getElementById(`p-${id}`), iI = document.getElementById(`i-${id}`), mI = document.getElementById(`m-${id}`), nI = document.getElementById(`n-${id}`);
-        const p = pI.value.trim(), i = iI.value.trim(), m = mI.value.trim(), n = nI.value.trim();
-        if(!p || !i || !m) return alert("請填寫姓名、餐點與金額");
-        const sIdx = db.findIndex(s => s.id === id);
-        if(!db[sIdx].details) db[sIdx].details = [];
-        db[sIdx].details.push({ person: p, item: i, money: Number(m), note: n, isDone: false });
-        save();
-        iI.value = ""; mI.value = ""; nI.value = "";
-        iI.focus();
-    };
-
-    // --- 圖片壓縮優化 (功能 1) ---
+    // 圖片壓縮邏輯 (優化 1)
     function compressImage(file) {
-        return new Promise((res, rej) => {
+        return new Promise((res) => {
             const reader = new FileReader();
             reader.readAsDataURL(file);
             reader.onload = (e) => {
@@ -189,94 +175,83 @@
                 img.src = e.target.result;
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
-                    let width = img.width;
-                    let height = img.height;
-                    const max_size = 1024; // 最大寬度/高度
-
+                    let width = img.width, height = img.height;
+                    const max_size = 800; // 縮小尺寸至 800px
                     if (width > height) {
                         if (width > max_size) { height *= max_size / width; width = max_size; }
                     } else {
                         if (height > max_size) { width *= max_size / height; height = max_size; }
                     }
-                    canvas.width = width;
-                    canvas.height = height;
+                    canvas.width = width; canvas.height = height;
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
-                    res(canvas.toDataURL('image/jpeg', 0.7)); // 壓縮品質設為 0.7
+                    res(canvas.toDataURL('image/jpeg', 0.6)); // 壓縮品質 0.6
                 };
-                img.onerror = (err) => rej(err);
             };
-            reader.onerror = (err) => rej(err);
         });
     }
 
-    // --- 新增餐廳時的錯誤處理 (功能 5) ---
+    // 切換頁面
+    window.switchPage = (pageId) => {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(pageId).classList.add('active');
+        if (window.event) window.event.currentTarget.classList.add('active');
+    };
+
+    // 新增餐廳
     window.addShop = async () => {
         const name = document.getElementById('newName').value, file = document.getElementById('newFile').files[0];
-        if (!name || !file) return alert("請填寫名稱並選擇圖片");
-        
+        if (!name || !file) return alert("請填寫名稱並挑選圖片");
         document.getElementById('addBtn').disabled = true;
         document.getElementById('loadingHint').style.display = 'block';
-        
         try {
             const imgData = await compressImage(file);
-            const newShop = { 
-                id: Date.now(), 
-                name, 
-                category: document.getElementById('newCategory').value, 
-                note: document.getElementById('newNote').value, 
-                image: imgData, 
-                details: [], 
-                visible: false 
-            };
-            
-            db.unshift(newShop);
-            await set(dbRef, db); // 使用 await 確保寫入成功
-            
-            document.getElementById('newName').value = ""; 
-            document.getElementById('newFile').value = "";
-            document.getElementById('newNote').value = "電話：\n時間：\n公休：";
+            db.unshift({ id: Date.now(), name, category: document.getElementById('newCategory').value, note: document.getElementById('newNote').value, image: imgData, details: [], visible: false });
+            await saveToFirebase();
+            document.getElementById('newName').value = ""; document.getElementById('newFile').value = "";
             alert("新增成功！");
-        } catch (e) { 
-            console.error(e);
-            alert("新增失敗：圖片處理出錯或 Firebase 空間不足。"); 
-        } finally {
-            document.getElementById('addBtn').disabled = false;
-            document.getElementById('loadingHint').style.display = 'none';
-        }
+        } catch (e) { alert("圖片處理出錯"); }
+        document.getElementById('addBtn').disabled = false;
+        document.getElementById('loadingHint').style.display = 'none';
     };
 
-    window.openEdit = (id) => {
-        curEditId = id;
-        const s = db.find(x => x.id === id);
-        document.getElementById('editName').value = s.name;
-        document.getElementById('editNote').value = s.note || "電話：\n時間：\n公休：";
-        document.getElementById('editModal').style.display = 'flex';
-    };
-    window.saveEdit = () => {
-        const s = db.find(x => x.id === curEditId);
-        if(s) {
-            s.name = document.getElementById('editName').value;
-            s.note = document.getElementById('editNote').value;
-            save();
-        }
-        closeEdit();
-    };
-    window.closeEdit = () => { document.getElementById('editModal').style.display = 'none'; };
+    // 管理頁面渲染 (勾選後才載入大圖優化)
+    window.renderAdminGrid = () => {
+        const kw = document.getElementById('adminSearch').value.toLowerCase();
+        const ft = document.getElementById('adminFilter').value;
+        const filtered = db.filter(s => s.name.toLowerCase().includes(kw) && (ft === '全部' || s.category === ft));
 
-    window.toggleShop = (id) => { const s = db.find(x => x.id === id); s.visible = !s.visible; save(); };
-    window.delShop = (id) => { if(confirm("確定刪除嗎？")) { db = db.filter(s => s.id !== id); save(); } };
-    window.toggleDone = (sId, idx) => { db.find(s => s.id === sId).details[idx].isDone = !db.find(s => s.id === sId).details[idx].isDone; save(); };
-    window.delDetail = (sId, idx) => { db.find(s => s.id === sId).details.splice(idx, 1); save(); };
-    window.openLightbox = (src) => { document.getElementById('boxImg').src = src; document.getElementById('lightbox').style.display = 'flex'; };
-    window.resetAllOrders = () => { if(confirm("清空紀錄？")) { db.forEach(s => s.details = []); save(); } };
+        document.getElementById('historyGrid').innerHTML = filtered.map(s => `
+            <div class="history-card ${s.visible ? 'is-active' : ''}">
+                <div onclick="toggleShop(${s.id})">
+                    ${s.visible 
+                        ? `<img src="${s.image}" style="width:100%; height:100px; object-fit:cover; cursor:pointer;">` 
+                        : `<div class="thumb-placeholder">
+                             <span style="font-size:24px;">🖼️</span>
+                             <span>點擊啟用</span>
+                           </div>`
+                    }
+                </div>
+                <div style="padding:10px; text-align:center;">
+                    <div style="font-weight:bold; font-size:14px; margin-bottom:5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${s.name}</div>
+                    <div style="display:flex; gap:5px; justify-content:center;">
+                        <button class="btn btn-edit" onclick="openEdit(${s.id})">編輯</button>
+                        <button class="btn btn-danger" style="padding:5px; font-size:12px;" onclick="delShop(${s.id})">刪除</button>
+                    </div>
+                </div>
+            </div>`).join('');
+    };
 
+    // 今日點餐頁面渲染
     function renderViewPage() {
         const list = document.getElementById('activeOrdersList');
         const categoryOrder = { "主食": 1, "飲料": 2, "甜品": 3 };
         const active = db.filter(s => s.visible).sort((a, b) => (categoryOrder[a.category] || 99) - (categoryOrder[b.category] || 99));
+        
         list.innerHTML = "";
         document.getElementById('emptyViewHint').style.display = active.length ? 'none' : 'block';
+
         active.forEach(shop => {
             const details = shop.details || [], total = details.reduce((sum, d) => sum + Number(d.money), 0);
             const div = document.createElement('div');
@@ -284,7 +259,9 @@
             div.innerHTML = `
                 <div class="shop-title">${shop.name}<span class="category-tag">${shop.category}</span></div>
                 <div class="shop-note-display">${shop.note || ''}</div>
-                <div class="image-frame" onclick="openLightbox('${shop.image}')"><img src="${shop.image}"></div>
+                <div class="image-frame" onclick="openLightbox('${shop.image}')">
+                    <img src="${shop.image}" loading="lazy">
+                </div>
                 <div class="order-input-group">
                     <div class="input-row">
                         <input type="text" id="p-${shop.id}" placeholder="姓名" style="flex:1">
@@ -292,7 +269,7 @@
                         <button class="btn btn-primary" style="flex:0.7" onclick="addDetail(${shop.id})">加入</button>
                     </div>
                     <div class="input-row">
-                        <textarea id="i-${shop.id}" class="resizable-item" placeholder="餐點名稱" style="flex:1.5"></textarea>
+                        <textarea id="i-${shop.id}" class="resizable-item" placeholder="餐點名稱"></textarea>
                         <input type="text" id="n-${shop.id}" placeholder="備註" style="flex:1">
                     </div>
                 </div>
@@ -310,22 +287,34 @@
         });
     }
 
-    window.renderAdminGrid = () => {
-        const kw = document.getElementById('adminSearch').value.toLowerCase();
-        const ft = document.getElementById('adminFilter').value;
-        const filtered = db.filter(s => s.name.toLowerCase().includes(kw) && (ft === '全部' || s.category === ft));
-        document.getElementById('historyGrid').innerHTML = filtered.map(s => `
-            <div class="history-card ${s.visible ? 'is-active' : ''}">
-                <img src="${s.image}" onclick="toggleShop(${s.id})">
-                <div style="padding:10px; text-align:center;">
-                    <div style="font-weight:bold;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.name}</div>
-                    <div style="display:flex; gap:5px; justify-content:center;">
-                        <button class="btn btn-edit" onclick="openEdit(${s.id})">編輯</button>
-                        <button class="btn btn-danger" style="padding:5px;font-size:12px;" onclick="delShop(${s.id})">刪除</button>
-                    </div>
-                </div>
-            </div>`).join('');
+    // 操作函式
+    window.toggleShop = (id) => { const s = db.find(x => x.id === id); s.visible = !s.visible; saveToFirebase(); };
+    window.delShop = (id) => { if(confirm("確定刪除這間餐廳嗎？資料將無法恢復")) { db = db.filter(s => s.id !== id); saveToFirebase(); } };
+    window.addDetail = (id) => {
+        const p = document.getElementById(`p-${id}`).value, i = document.getElementById(`i-${id}`).value, m = document.getElementById(`m-${id}`).value, n = document.getElementById(`n-${id}`).value;
+        if(!p || !i || !m) return alert("姓名、餐點、金額必填");
+        const shop = db.find(s => s.id === id);
+        if(!shop.details) shop.details = [];
+        shop.details.push({ person: p, item: i, money: Number(m), note: n, isDone: false });
+        saveToFirebase();
     };
+    window.toggleDone = (sId, idx) => { db.find(s => s.id === sId).details[idx].isDone = !db.find(s => s.id === sId).details[idx].isDone; saveToFirebase(); };
+    window.delDetail = (sId, idx) => { db.find(s => s.id === sId).details.splice(idx, 1); saveToFirebase(); };
+    window.resetAllOrders = () => { if(confirm("確定清空今日所有點餐紀錄？")) { db.forEach(s => s.details = []); saveToFirebase(); } };
+    window.openLightbox = (src) => { document.getElementById('boxImg').src = src; document.getElementById('lightbox').style.display = 'flex'; };
+    
+    window.openEdit = (id) => {
+        curEditId = id; const s = db.find(x => x.id === id);
+        document.getElementById('editName').value = s.name;
+        document.getElementById('editNote').value = s.note || "";
+        document.getElementById('editModal').style.display = 'flex';
+    };
+    window.saveEdit = () => {
+        const s = db.find(x => x.id === curEditId);
+        if(s) { s.name = document.getElementById('editName').value; s.note = document.getElementById('editNote').value; saveToFirebase(); }
+        closeEdit();
+    };
+    window.closeEdit = () => { document.getElementById('editModal').style.display = 'none'; };
 
     function renderSummaryPage() {
         const active = db.filter(s => s.visible && s.details?.length);
