@@ -3,55 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>訂單管理系統 - 效能旗艦版</title>
+    <title>訂單管理系統 - 效能旗艦全縮圖版</title>
     <style>
         :root { --primary: #4a90e2; --secondary: #34495e; --bg: #f5f7fa; --danger: #ff4d4f; --edit: #f39c12; --success: #2ecc71; }
         body { font-family: "Microsoft JhengHei", sans-serif; background: var(--bg); margin: 0; padding: 0; color: #333; -webkit-tap-highlight-color: transparent; }
-        
-        /* 導航欄優化 */
         .tab-bar { display: flex; background: var(--secondary); position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
         .tab-btn { flex: 1; padding: 15px 5px; border: none; background: none; color: #adb5bd; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.3s; }
         .tab-btn.active { color: white; border-bottom: 4px solid var(--primary); background: rgba(255,255,255,0.1); }
-        
         .container { max-width: 900px; margin: 0 auto; padding: 15px; min-height: 100vh; }
         .page { display: none; animation: fadeIn 0.3s ease; }
         .page.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* 卡片設計優化 */
         .shop-order-card { background: white; border-radius: 16px; padding: 18px; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #eef2f6; }
         .shop-title { font-size: 20px; font-weight: 800; color: var(--secondary); margin-bottom: 10px; display: flex; align-items: center; }
         .shop-title::before { content: ""; width: 6px; height: 20px; background: var(--primary); border-radius: 3px; margin-right: 12px; }
         .category-tag { font-size: 11px; background: #e2e8f0; color: #475569; padding: 2px 8px; border-radius: 20px; margin-left: auto; }
-        
-        /* 圖片容器 */
         .image-frame { width: 100%; min-height: 100px; border-radius: 12px; margin: 12px 0; background: #f8fafc; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #edf2f7; }
         .image-frame img { max-width: 100%; height: auto; max-height: 550px; object-fit: contain; cursor: zoom-in; }
-
-        /* 輸入區塊 */
         .order-input-group { background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 15px; }
         .input-row { display: flex; gap: 8px; margin-bottom: 10px; }
-        input, textarea, select { padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 16px !important; transition: 0.2s; }
-        input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(74,144,226,0.1); }
-
-        /* 管理格點 */
-        .history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
-        .history-card { border: 2px solid #eef2f6; border-radius: 12px; background: white; overflow: hidden; transition: 0.2s; }
-        .history-card.is-active { border-color: var(--primary); }
-        .thumb-box { height: 100px; background: #f1f5f9; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 24px; }
-        .thumb-box img { width: 100%; height: 100%; object-fit: cover; }
-
-        /* 按鈕風格 */
+        input, textarea, select { padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 16px !important; transition: 0.2s; width: 100%; box-sizing: border-box; }
+        .history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+        .history-card { border: 2px solid #eef2f6; border-radius: 12px; background: white; overflow: hidden; transition: 0.2s; position: relative; }
+        .history-card.is-active { border-color: var(--primary); box-shadow: 0 0 8px rgba(74,144,226,0.3); }
+        .thumb-box { height: 110px; background: #eee; cursor: pointer; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+        .thumb-box img { width: 100%; height: 100%; object-fit: cover; transition: 0.3s; }
+        .history-card:not(.is-active) .thumb-box img { filter: grayscale(0.8) brightness(0.7); }
+        .status-badge { position: absolute; top: 5px; right: 5px; font-size: 10px; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.6); color: white; }
+        .is-active .status-badge { background: var(--success); }
         .btn { border: none; border-radius: 8px; padding: 10px 16px; cursor: pointer; font-weight: bold; transition: 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
-        .btn:active { transform: scale(0.96); opacity: 0.8; }
         .btn-primary { background: var(--primary); color: white; }
         .btn-danger { background: var(--danger); color: white; }
         .btn-success { background: var(--success); color: white; width: 100%; margin-top: 10px; }
-        
-        /* 燈箱與彈窗 */
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
         .modal-content { background: white; padding: 25px; border-radius: 16px; width: 85%; max-width: 400px; }
         #lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 2100; align-items: center; justify-content: center; }
+        .name-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+        .chip { background: #e2e8f0; font-size: 12px; padding: 4px 10px; border-radius: 15px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -63,19 +51,17 @@
 </div>
 
 <div class="container">
-    <!-- 今日點餐 -->
     <div id="page-view" class="page active">
         <div id="activeOrdersList"></div>
         <div id="emptyViewHint" style="text-align:center; color:#94a3b8; padding:100px 20px;">
             <div style="font-size: 50px; margin-bottom: 10px;">🍽️</div>
             <h3>尚未挑選餐廳</h3>
-            <p>請至「餐廳管理」開啟想點的餐廳</p>
+            <p>請至「餐廳管理」點擊圖片開啟今日菜單</p>
         </div>
     </div>
 
-    <!-- 餐廳管理 -->
     <div id="page-admin" class="page">
-        <div class="admin-controls">
+        <div class="shop-order-card">
             <h3 style="margin-top:0">➕ 新增餐廳</h3>
             <input type="text" id="newName" placeholder="餐廳名稱">
             <select id="newCategory" style="margin: 10px 0;">
@@ -83,20 +69,21 @@
                 <option value="飲料">🥤 飲料</option>
                 <option value="甜品">🍰 甜品</option>
             </select>
-            <textarea id="newNote" style="height:80px; margin-bottom:10px;" placeholder="備註資訊（電話、營業時間等）">電話：&#10時間：&#10公休：</textarea>
+            <textarea id="newNote" style="height:80px; margin-bottom:10px;" placeholder="備註資訊">電話：&#10;時間：&#10;公休:</textarea>
             <input type="file" id="newFile" accept="image/*">
             <button id="addBtn" class="btn btn-primary" style="width:100%; margin-top:15px;" onclick="addShop()">確認新增</button>
-            <div id="loadingHint" style="display:none; color:var(--primary); text-align:center; font-size:14px; margin-top:10px;">⚡ 圖片優化處理中...</div>
+            <div id="loadingHint" style="display:none; color:var(--primary); text-align:center; font-size:14px; margin-top:10px;">⚡ 處理中...</div>
         </div>
 
-        <div class="admin-controls">
+        <div class="shop-order-card">
             <h3>🔍 已存餐廳</h3>
             <div class="input-row">
-                <input type="text" id="adminSearch" placeholder="搜尋..." oninput="renderAdminGrid()">
+                <input type="text" id="adminSearch" placeholder="搜尋名稱..." oninput="debounceSearch()">
                 <select id="adminFilter" onchange="renderAdminGrid()" style="width:120px;">
                     <option value="全部">全部</option>
                     <option value="主食">主食</option>
                     <option value="飲料">飲料</option>
+                    <option value="甜品">甜品</option>
                 </select>
             </div>
             <button class="btn btn-danger" style="width:100%; opacity:0.7" onclick="resetAllOrders()">🧹 清空今日點餐紀錄</button>
@@ -104,7 +91,6 @@
         <div class="history-grid" id="historyGrid"></div>
     </div>
 
-    <!-- 數量統計 -->
     <div id="page-summary" class="page">
         <div id="summaryContent"></div>
     </div>
@@ -143,29 +129,25 @@
     const dbRef = ref(database, 'orderSystem_V23');
 
     let db = [];
-    let lastJson = ""; // 用於比對數據是否有變動
+    let lastJson = "";
+    let nameHistory = JSON.parse(localStorage.getItem('order_names') || '[]');
 
-    // 監聽數據 (增加比對邏輯，防止無謂重繪)
     onValue(dbRef, (snapshot) => {
         const data = snapshot.val() || [];
         const currentJson = JSON.stringify(data);
         if (currentJson === lastJson) return; 
         lastJson = currentJson;
         db = data;
-        
         renderViewPage();
         renderAdminGrid();
         renderSummaryPage();
     });
 
-    // 統一儲存函式
     const sync = async () => {
-        try { await set(dbRef, db); } 
-        catch (e) { alert("儲存失敗，請檢查網路！"); }
+        try { await set(dbRef, db); } catch (e) { alert("儲存失敗"); }
     };
 
-    // 圖片處理 (強制轉 JPEG 降低體積)
-    const processImage = (file) => {
+    const processImageSet = (file) => {
         return new Promise((resolve) => {
             const reader = new FileReader();
             reader.readAsDataURL(file);
@@ -173,20 +155,21 @@
                 const img = new Image();
                 img.src = e.target.result;
                 img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const max_w = 800;
-                    let w = img.width, h = img.height;
-                    if (w > max_w) { h *= max_w / w; w = max_w; }
-                    canvas.width = w; canvas.height = h;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, w, h);
-                    resolve(canvas.toDataURL('image/jpeg', 0.6));
+                    const getCanvasData = (maxSize, quality) => {
+                        const canvas = document.createElement('canvas');
+                        let w = img.width, h = img.height;
+                        if (w > maxSize) { h *= maxSize / w; w = maxSize; }
+                        canvas.width = w; canvas.height = h;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, w, h);
+                        return canvas.toDataURL('image/jpeg', quality);
+                    };
+                    resolve({ large: getCanvasData(800, 0.6), thumb: getCanvasData(160, 0.4) });
                 };
             };
         });
     };
 
-    // 頁面切換
     window.switchPage = (pageId) => {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -194,148 +177,145 @@
         if (event) event.currentTarget.classList.add('active');
     };
 
-    // 新增餐廳
     window.addShop = async () => {
         const n = document.getElementById('newName').value, f = document.getElementById('newFile').files[0];
-        if (!n || !f) return alert("請輸入名稱與選擇照片");
+        if (!n || !f) return alert("名稱與照片必填");
         const btn = document.getElementById('addBtn');
         btn.disabled = true;
         document.getElementById('loadingHint').style.display = 'block';
-        
-        const img = await processImage(f);
-        db.unshift({ id: Date.now(), name: n, category: document.getElementById('newCategory').value, note: document.getElementById('newNote').value, image: img, details: [], visible: false });
+        const imgs = await processImageSet(f);
+        db.unshift({ id: Date.now(), name: n, category: document.getElementById('newCategory').value, note: document.getElementById('newNote').value, image: imgs.large, thumb: imgs.thumb, details: [], visible: false });
         await sync();
-        
-        document.getElementById('newName').value = "";
-        document.getElementById('newFile').value = "";
-        btn.disabled = false;
-        document.getElementById('loadingHint').style.display = 'none';
-        alert("新增成功！");
+        document.getElementById('newName').value = ""; document.getElementById('newFile').value = "";
+        btn.disabled = false; document.getElementById('loadingHint').style.display = 'none';
     };
 
-    // 點餐功能 (自動清空輸入並聚焦)
     window.addDetail = (id) => {
-        const pInput = document.getElementById(`p-${id}`), iInput = document.getElementById(`i-${id}`), mInput = document.getElementById(`m-${id}`), nInput = document.getElementById(`n-${id}`);
-        const p = pInput.value, i = iInput.value, m = mInput.value;
-        if (!p || !i || !m) return alert("姓名、餐點、金額必填");
+        const p = document.getElementById(`p-${id}`).value, i = document.getElementById(`i-${id}`).value, m = document.getElementById(`m-${id}`).value, n = document.getElementById(`n-${id}`).value;
+        if (!p || !i || !m) return alert("必填未滿");
         
+        if (!nameHistory.includes(p)) {
+            nameHistory.unshift(p);
+            nameHistory = nameHistory.slice(0, 10);
+            localStorage.setItem('order_names', JSON.stringify(nameHistory));
+        }
+
         const shop = db.find(s => s.id === id);
         if (!shop.details) shop.details = [];
-        shop.details.push({ person: p, item: i, money: Number(m), note: nInput.value, isDone: false });
+        shop.details.push({ person: p, item: i, money: Number(m), note: n, isDone: false });
         sync();
-        
-        iInput.value = ""; mInput.value = ""; nInput.value = "";
-        iInput.focus();
+        document.getElementById(`i-${id}`).value = ""; document.getElementById(`m-${id}`).value = ""; document.getElementById(`n-${id}`).value = "";
+        document.getElementById(`i-${id}`).focus();
     };
 
-    // 渲染：今日點餐
+    window.quickFillName = (id, name) => {
+        document.getElementById(`p-${id}`).value = name;
+    };
+
     function renderViewPage() {
         const container = document.getElementById('activeOrdersList');
         const active = db.filter(s => s.visible);
         document.getElementById('emptyViewHint').style.display = active.length ? 'none' : 'block';
         
+        const chipsHTML = nameHistory.map(n => `<span class="chip" onclick="window.quickFillName(ID_HOLDER, '${n}')">${n}</span>`).join('');
+
         container.innerHTML = active.map(s => `
             <div class="shop-order-card">
                 <div class="shop-title">${s.name} <span class="category-tag">${s.category}</span></div>
-                <div style="font-size:13px; color:#666; margin-bottom:10px;">${s.note.replace(/\n/g,'<br>')}</div>
-                <div class="image-frame"><img src="${s.image}" onclick="window.openImg('${s.image}')" loading="lazy"></div>
-                
+                <div style="font-size:13px; color:#666;">${s.note.replace(/\n/g,'<br>')}</div>
+                <div class="image-frame"><img src="${s.image}" onclick="window.openImg('${s.image}')"></div>
                 <div class="order-input-group">
                     <div class="input-row">
                         <input type="text" id="p-${s.id}" placeholder="姓名" style="flex:1">
                         <input type="number" id="m-${s.id}" placeholder="金額" style="flex:0.8">
                         <button class="btn btn-primary" onclick="addDetail(${s.id})">送出</button>
                     </div>
-                    <textarea id="i-${s.id}" placeholder="餐點名稱" style="width:100%; height:45px; margin-bottom:8px;"></textarea>
-                    <input type="text" id="n-${s.id}" placeholder="備註 (如：去冰、不蔥)">
+                    <div class="name-chips">${chipsHTML.replace(/ID_HOLDER/g, s.id)}</div>
+                    <textarea id="i-${s.id}" placeholder="餐點名稱" style="height:45px; margin: 8px 0;"></textarea>
+                    <input type="text" id="n-${s.id}" placeholder="備註">
                 </div>
-
-                <table style="width:100%; border-collapse:collapse;">
-                    <thead><tr style="font-size:12px; color:#888;">
-                        <th width="30">勾</th><th width="60">姓名</th><th>餐點</th><th width="40">$</th><th width="30">✕</th>
-                    </tr></thead>
+                <table style="width:100%; font-size:14px; border-collapse: collapse;">
                     <tbody>${(s.details || []).map((d, idx) => `
-                        <tr style="border-bottom:1px solid #eee; ${d.isDone ? 'opacity:0.4; text-decoration:line-through' : ''}">
-                            <td align="center"><input type="checkbox" ${d.isDone ? 'checked' : ''} onchange="toggleOrder(${s.id},${idx})"></td>
-                            <td align="center">${d.person}</td>
-                            <td>${d.item}<div style="font-size:11px; color:#999;">${d.note}</div></td>
-                            <td align="center"><b>${d.money}</b></td>
-                            <td align="center" onclick="delOrder(${s.id},${idx})" style="color:red; cursor:pointer;">✕</td>
+                        <tr style="border-bottom:1px solid #f0f0f0; ${d.isDone ? 'opacity:0.4; text-decoration:line-through' : ''}">
+                            <td width="30" style="padding:10px 0;"><input type="checkbox" ${d.isDone ? 'checked' : ''} onchange="toggleOrder(${s.id},${idx})"></td>
+                            <td style="padding:10px 0;">${d.person} - ${d.item} (${d.money}) ${d.note ? `<br><small style="color:var(--edit)">※${d.note}</small>` : ''}</td>
+                            <td width="30" align="center" onclick="delOrder(${s.id},${idx})" style="color:red; cursor:pointer;">✕</td>
                         </tr>`).join('')}
                     </tbody>
                 </table>
-                <div style="text-align:right; margin-top:10px; font-weight:bold; color:var(--danger);">總計: $${(s.details || []).reduce((a,b)=>a+b.money,0)}</div>
-            </div>
-        `).join('');
+            </div>`).join('');
     }
 
-    // 渲染：管理
+    let searchTimer;
+    window.debounceSearch = () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(renderAdminGrid, 300);
+    };
+
     window.renderAdminGrid = () => {
         const kw = document.getElementById('adminSearch').value.toLowerCase();
-        const filtered = db.filter(s => s.name.toLowerCase().includes(kw));
+        const ft = document.getElementById('adminFilter').value;
+        const filtered = db.filter(s => s.name.toLowerCase().includes(kw) && (ft === '全部' || s.category === ft));
         document.getElementById('historyGrid').innerHTML = filtered.map(s => `
             <div class="history-card ${s.visible ? 'is-active' : ''}">
                 <div class="thumb-box" onclick="toggleShop(${s.id})">
-                    ${s.visible ? `<img src="${s.image}">` : '📁'}
+                    <img src="${s.thumb || s.image}">
+                    <span class="status-badge">${s.visible ? '點餐中' : '休息中'}</span>
                 </div>
                 <div style="padding:10px; text-align:center;">
-                    <div style="font-size:13px; font-weight:bold; margin-bottom:8px; height:18px; overflow:hidden;">${s.name}</div>
-                    <div style="display:flex; gap:5px;">
-                        <button class="btn btn-edit" style="flex:1" onclick="openEdit(${s.id})">改</button>
-                        <button class="btn btn-danger" style="padding:5px;" onclick="delShop(${s.id})">✕</button>
+                    <div style="font-size:12px; font-weight:bold; height:34px; overflow:hidden; line-height:1.4;">${s.name}</div>
+                    <div style="display:flex; gap:4px; justify-content:center;">
+                        <button class="btn" onclick="openEdit(${s.id})" style="background:var(--edit); color:white; font-size:10px; padding:4px 8px;">改</button>
+                        <button class="btn btn-danger" onclick="delShop(${s.id})" style="font-size:10px; padding:4px 8px;">✕</button>
                     </div>
                 </div>
             </div>`).join('');
     };
 
-    // 渲染：統計與複製功能
     function renderSummaryPage() {
         const active = db.filter(s => s.visible && s.details?.length);
+        if (!active.length) {
+            document.getElementById('summaryContent').innerHTML = '<div style="text-align:center; padding:50px; color:#94a3b8;">目前無點餐數據</div>';
+            return;
+        }
+
         document.getElementById('summaryContent').innerHTML = active.map(s => {
             const counts = {};
-            s.details.forEach(d => {
-                const key = `${d.item} ${d.note ? '('+d.note+')' : ''}`;
-                counts[key] = (counts[key] || 0) + 1;
+            let total = 0;
+            s.details.forEach(d => { 
+                const key = `${d.item}${d.note ? ' ('+d.note+')' : ''}`; 
+                counts[key] = (counts[key] || 0) + 1; 
+                total += Number(d.money || 0);
             });
-            const summaryStr = Object.entries(counts).map(([k, v]) => `${k} x ${v}`).join('\\n');
             
+            const summaryStr = Object.entries(counts).map(([k, v]) => `· ${k} x ${v}`).join('\n');
+            const fullCopyText = `【${s.name} 統計】\n${summaryStr}\n---\n總金額：$${total}`;
+
             return `
                 <div class="shop-order-card">
-                    <h3>${s.name} 統計</h3>
-                    ${Object.entries(counts).map(([k, v]) => `
-                        <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px dashed #ddd;">
-                            <span>${k}</span><b>${v} 份</b>
-                        </div>`).join('')}
-                    <button class="btn btn-success" onclick="copyText('${s.name}\\n${summaryStr}')">📋 複製統計文字</button>
+                    <h3 style="margin-top:0">${s.name} 統計</h3>
+                    <div style="background:#f8fafc; padding:15px; border-radius:8px; margin-bottom:10px;">
+                        ${Object.entries(counts).map(([k, v]) => `<div style="margin-bottom:4px;">${k}: <b>${v} 份</b></div>`).join('')}
+                        <hr style="border:0; border-top:1px dashed #ccc; margin:10px 0;">
+                        <div style="text-align:right; font-size:1.1em; color:var(--danger); font-weight:bold;">總金額：$ ${total}</div>
+                    </div>
+                    <button class="btn btn-success" onclick="copyText(\`${fullCopyText.replace(/`/g, '\\`')}\`)">複製統計與總額</button>
                 </div>`;
-        }).join('') || '<div style="text-align:center; margin-top:50px; color:#999;">目前無點餐數據</div>';
+        }).join('');
     }
 
-    // 輔助功能
     window.toggleShop = (id) => { const s = db.find(x=>x.id===id); s.visible = !s.visible; sync(); };
     window.toggleOrder = (sId, idx) => { db.find(s=>s.id===sId).details[idx].isDone = !db.find(s=>s.id===sId).details[idx].isDone; sync(); };
-    window.delOrder = (sId, idx) => { if(confirm("確定刪除？")) { db.find(s=>s.id===sId).details.splice(idx,1); sync(); } };
-    window.delShop = (id) => { if(confirm("將永久刪除此餐廳，確定？")) { db = db.filter(x=>x.id!==id); sync(); } };
+    window.delOrder = (sId, idx) => { if(confirm("刪除這筆點餐？")) { db.find(s=>s.id===sId).details.splice(idx,1); sync(); } };
+    window.delShop = (id) => { if(confirm("確定永久刪除這家餐廳？")) { db = db.filter(x=>x.id!==id); sync(); } };
     window.openImg = (src) => { document.getElementById('boxImg').src = src; document.getElementById('lightbox').style.display = 'flex'; };
-    window.resetAllOrders = () => { if(confirm("清空紀錄？")) { db.forEach(s=>s.details=[]); sync(); } };
-    window.copyText = (txt) => { navigator.clipboard.writeText(txt.replace(/\\n/g,'\n')); alert("已複製到剪貼簿！"); };
+    window.resetAllOrders = () => { if(confirm("確定要清空所有進行中的點餐紀錄嗎？")) { db.forEach(s=>s.details=[]); sync(); } };
+    window.copyText = (txt) => { navigator.clipboard.writeText(txt); alert("複製成功"); };
     
-    // 編輯功能
     let curId = null;
-    window.openEdit = (id) => {
-        curId = id; const s = db.find(x=>x.id===id);
-        document.getElementById('editName').value = s.name;
-        document.getElementById('editNote').value = s.note;
-        document.getElementById('editModal').style.display = 'flex';
-    };
-    window.saveEdit = () => {
-        const s = db.find(x=>x.id===curId);
-        s.name = document.getElementById('editName').value;
-        s.note = document.getElementById('editNote').value;
-        sync(); closeEdit();
-    };
+    window.openEdit = (id) => { curId = id; const s = db.find(x=>x.id===id); document.getElementById('editName').value = s.name; document.getElementById('editNote').value = s.note; document.getElementById('editModal').style.display = 'flex'; };
+    window.saveEdit = () => { const s = db.find(x=>x.id===curId); s.name = document.getElementById('editName').value; s.note = document.getElementById('editNote').value; sync(); closeEdit(); };
     window.closeEdit = () => document.getElementById('editModal').style.display = 'none';
-
 </script>
 </body>
 </html>
