@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>小胖點餐系統 - 升級版</title>
+    <title>訂單管理系統 - 分類修改版</title>
     <style>
         :root { --primary: #4a90e2; --secondary: #34495e; --bg: #f5f7fa; --danger: #ff4d4f; --edit: #f39c12; --success: #2ecc71; }
         body { font-family: "Microsoft JhengHei", sans-serif; background: var(--bg); margin: 0; padding: 0; color: #333; -webkit-tap-highlight-color: transparent; }
@@ -20,7 +20,6 @@
         .shop-title::before { content: ""; width: 6px; height: 20px; background: var(--primary); border-radius: 3px; margin-right: 12px; }
         .category-tag { font-size: 11px; background: #e2e8f0; color: #475569; padding: 2px 8px; border-radius: 20px; margin-left: auto; }
         
-        /* 篩選按鈕樣式 */
         .filter-bar { display: flex; gap: 8px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px; }
         .filter-chip { padding: 6px 16px; border-radius: 20px; background: white; border: 1px solid #ddd; font-size: 13px; cursor: pointer; white-space: nowrap; transition: 0.2s; }
         .filter-chip.active { background: var(--primary); color: white; border-color: var(--primary); }
@@ -72,7 +71,7 @@
     </div>
 
     <div id="page-admin" class="page">
-        <!-- 新增餐廳區域 -->
+        <!-- 新增餐廳 -->
         <div class="shop-order-card">
             <h3 style="margin-top:0">➕ 新增餐廳</h3>
             <input type="text" id="newName" placeholder="餐廳名稱">
@@ -88,14 +87,13 @@
             <div id="loadingHint" style="display:none; color:var(--primary); text-align:center; font-size:14px; margin-top:10px; font-weight:bold;">⚡ 處理中...</div>
         </div>
 
-        <!-- 已存餐廳 & 篩選區域 -->
+        <!-- 已存餐廳 & 篩選 -->
         <div class="shop-order-card">
             <h3>🔍 已存餐廳</h3>
             <div class="input-row">
                 <input type="text" id="adminSearch" placeholder="搜尋名稱..." oninput="renderAdminGrid()">
             </div>
             
-            <!-- 類別篩選按鈕 -->
             <div class="filter-bar">
                 <div class="filter-chip active" onclick="setFilter('全部', this)">全部</div>
                 <div class="filter-chip" onclick="setFilter('主食', this)">🍱 主食</div>
@@ -114,14 +112,26 @@
     </div>
 </div>
 
-<!-- 編輯視窗 -->
+<!-- 編輯視窗 (Modal) -->
 <div id="editModal" class="modal">
     <div class="modal-content">
         <h3>📝 編輯資訊</h3>
+        <label style="font-size: 12px; color: #666;">餐廳名稱：</label>
         <input type="text" id="editName">
-        <textarea id="editNote" style="height:120px; margin: 15px 0;"></textarea>
+        
+        <label style="font-size: 12px; color: #666; display: block; margin-top: 10px;">分類標籤：</label>
+        <select id="editCategory" style="margin: 5px 0 15px 0;">
+            <option value="主食">🍱 主食</option>
+            <option value="飲料">🥤 飲料</option>
+            <option value="點心">🍰 點心</option>
+            <option value="甜品">🍰 甜品 (舊版)</option> <!-- 保留舊選項以便轉換 -->
+        </select>
+        
+        <label style="font-size: 12px; color: #666;">備註資訊：</label>
+        <textarea id="editNote" style="height:120px; margin: 5px 0 15px 0;"></textarea>
+        
         <div style="display: flex; gap: 10px;">
-            <button class="btn btn-primary" style="flex:1" onclick="saveEdit()">儲存</button>
+            <button class="btn btn-primary" style="flex:1" onclick="saveEdit()">儲存修改</button>
             <button class="btn" style="flex:1; background:#eee" onclick="closeEdit()">取消</button>
         </div>
     </div>
@@ -172,14 +182,12 @@
                     let w = img.width, h = img.height;
                     const max = 1200, thumbMax = 150;
                     
-                    // 大圖
                     let dw = w, dh = h;
                     if(dw > max || dh > max) { dw > dh ? (dh *= max/dw, dw = max) : (dw *= max/dh, dh = max); }
                     canvas.width = dw; canvas.height = dh;
                     canvas.getContext('2d').drawImage(img, 0, 0, dw, dh);
                     const large = canvas.toDataURL('image/jpeg', 0.7);
                     
-                    // 縮圖
                     let tw = w, th = h;
                     if(tw > thumbMax || th > thumbMax) { tw > th ? (th *= thumbMax/tw, tw = thumbMax) : (tw *= thumbMax/th, th = thumbMax); }
                     canvas.width = tw; canvas.height = th;
@@ -230,7 +238,8 @@
         const kw = document.getElementById('adminSearch').value.toLowerCase();
         const filtered = db.filter(s => {
             const matchKw = s.name.toLowerCase().includes(kw);
-            const matchCat = (currentFilter === '全部' || s.category === currentFilter);
+            // 點擊「點心」篩選時，同時顯示舊有的「甜品」
+            const matchCat = (currentFilter === '全部' || s.category === currentFilter || (currentFilter === '點心' && s.category === '甜品'));
             return matchKw && matchCat;
         });
 
@@ -307,8 +316,22 @@
     window.resetAllOrders = () => { if(confirm("清空今日紀錄？")) { db.forEach(s=>s.details=[]); sync(); } };
     
     let curId = null;
-    window.openEdit = (id) => { curId = id; const s = db.find(x=>x.id===id); document.getElementById('editName').value = s.name; document.getElementById('editNote').value = s.note; document.getElementById('editModal').style.display = 'flex'; };
-    window.saveEdit = () => { const s = db.find(x=>x.id===curId); s.name = document.getElementById('editName').value; s.note = document.getElementById('editNote').value; sync(); closeEdit(); };
+    window.openEdit = (id) => { 
+        curId = id; 
+        const s = db.find(x=>x.id===id); 
+        document.getElementById('editName').value = s.name; 
+        document.getElementById('editCategory').value = s.category; // 自動帶入目前的分類
+        document.getElementById('editNote').value = s.note; 
+        document.getElementById('editModal').style.display = 'flex'; 
+    };
+    window.saveEdit = () => { 
+        const s = db.find(x=>x.id===curId); 
+        s.name = document.getElementById('editName').value; 
+        s.category = document.getElementById('editCategory').value; // 儲存新選擇的分類
+        s.note = document.getElementById('editNote').value; 
+        sync(); 
+        closeEdit(); 
+    };
     window.closeEdit = () => document.getElementById('editModal').style.display = 'none';
 </script>
 </body>
