@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>訂單管理系統 - 極速上傳版</title>
+    <title>訂單管理系統 - 穩定極速版</title>
     <style>
         :root { --primary: #4a90e2; --secondary: #34495e; --bg: #f5f7fa; --danger: #ff4d4f; --edit: #f39c12; --success: #2ecc71; }
         body { font-family: "Microsoft JhengHei", sans-serif; background: var(--bg); margin: 0; padding: 0; color: #333; -webkit-tap-highlight-color: transparent; }
@@ -72,7 +72,7 @@
             <textarea id="newNote" style="height:80px; margin-bottom:10px;" placeholder="備註資訊">電話：&#10;時間：&#10;公休:</textarea>
             <input type="file" id="newFile" accept="image/*">
             <button id="addBtn" class="btn btn-primary" style="width:100%; margin-top:15px;" onclick="addShop()">確認新增</button>
-            <div id="loadingHint" style="display:none; color:var(--primary); text-align:center; font-size:14px; margin-top:10px;">⚡ 極速處理中...</div>
+            <div id="loadingHint" style="display:none; color:var(--primary); text-align:center; font-size:14px; margin-top:10px; font-weight:bold;">⚡ 處理中...請勿關閉視窗</div>
         </div>
 
         <div class="shop-order-card">
@@ -144,20 +144,17 @@
     });
 
     const sync = async () => {
-        try { await set(dbRef, db); } catch (e) { alert("同步失敗"); }
+        try { await set(dbRef, db); } catch (e) { console.error("Sync Error:", e); }
     };
 
-    // --- 極速圖片處理邏輯 ---
+    // --- 極速圖片壓縮 (500px, Quality 0.4) ---
     const processImageSet = (file) => {
         return new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => reject("處理逾時"), 8000);
+            const timeout = setTimeout(() => reject("處理逾時，請換小一點的照片"), 10000);
             const reader = new FileReader();
-            
-            reader.onerror = () => { clearTimeout(timeout); reject("讀檔錯誤"); };
             reader.readAsDataURL(file);
             reader.onload = (e) => {
                 const img = new Image();
-                img.onerror = () => { clearTimeout(timeout); reject("格式錯誤"); };
                 img.src = e.target.result;
                 img.onload = () => {
                     const getCanvasData = (maxSize, quality) => {
@@ -167,12 +164,11 @@
                         canvas.width = w; canvas.height = h;
                         const ctx = canvas.getContext('2d');
                         ctx.imageSmoothingEnabled = true;
-                        ctx.imageSmoothingQuality = 'low'; // 換取速度
+                        ctx.imageSmoothingQuality = 'low';
                         ctx.drawImage(img, 0, 0, w, h);
                         return canvas.toDataURL('image/jpeg', quality);
                     };
                     try {
-                        // 極速設定：500px, 0.4 品質
                         const result = { 
                             large: getCanvasData(500, 0.4), 
                             thumb: getCanvasData(120, 0.3) 
@@ -195,16 +191,18 @@
         if (event) event.currentTarget.classList.add('active');
     };
 
+    // --- 優化後的新增邏輯 (保證恢復 UI) ---
     window.addShop = async () => {
         const n = document.getElementById('newName').value;
         const f = document.getElementById('newFile').files[0];
         const btn = document.getElementById('addBtn');
         const hint = document.getElementById('loadingHint');
 
-        if (!n || !f) return alert("請填寫名稱與選擇照片");
+        if (!n || !f) return alert("請填寫名稱並選擇照片");
 
+        // UI 鎖定
         btn.disabled = true;
-        btn.innerText = "⚡ 壓縮中...";
+        btn.innerText = "⚡ 處理中...";
         hint.style.display = 'block';
 
         try {
@@ -221,15 +219,19 @@
             };
             db.unshift(newShop);
             await sync();
+            
+            // 成功後清空欄位
             document.getElementById('newName').value = ""; 
             document.getElementById('newFile').value = "";
-            alert("新增成功！");
+            alert("✅ 新增成功！");
         } catch (error) {
-            alert("失敗：" + error);
+            alert("❌ 失敗：" + error);
         } finally {
+            // 無論如何都恢復按鈕
             btn.disabled = false;
             btn.innerText = "確認新增";
             hint.style.display = 'none';
+            renderAdminGrid(); // 強制重繪列表
         }
     };
 
@@ -309,7 +311,7 @@
     function renderSummaryPage() {
         const active = db.filter(s => s.visible && s.details?.length);
         if (!active.length) {
-            document.getElementById('summaryContent').innerHTML = '<div style="text-align:center; padding:50px; color:#94a3b8;">目前無數據</div>';
+            document.getElementById('summaryContent').innerHTML = '<div style="text-align:center; padding:50px; color:#94a3b8;">目前無點餐</div>';
             return;
         }
         document.getElementById('summaryContent').innerHTML = active.map(s => {
@@ -335,10 +337,10 @@
 
     window.toggleShop = (id) => { const s = db.find(x=>x.id===id); s.visible = !s.visible; sync(); };
     window.toggleOrder = (sId, idx) => { db.find(s=>s.id===sId).details[idx].isDone = !db.find(s=>s.id===sId).details[idx].isDone; sync(); };
-    window.delOrder = (sId, idx) => { if(confirm("刪除這筆？")) { db.find(s=>s.id===sId).details.splice(idx,1); sync(); } };
-    window.delShop = (id) => { if(confirm("確定永久刪除？")) { db = db.filter(x=>x.id!==id); sync(); } };
+    window.delOrder = (sId, idx) => { if(confirm("刪除？")) { db.find(s=>s.id===sId).details.splice(idx,1); sync(); } };
+    window.delShop = (id) => { if(confirm("永久刪除餐廳？")) { db = db.filter(x=>x.id!==id); sync(); } };
     window.openImg = (src) => { document.getElementById('boxImg').src = src; document.getElementById('lightbox').style.display = 'flex'; };
-    window.resetAllOrders = () => { if(confirm("確定要清空所有紀錄嗎？")) { db.forEach(s=>s.details=[]); sync(); } };
+    window.resetAllOrders = () => { if(confirm("確定清空今日紀錄？")) { db.forEach(s=>s.details=[]); sync(); } };
     window.copyText = (txt) => { navigator.clipboard.writeText(txt); alert("複製成功"); };
     let curId = null;
     window.openEdit = (id) => { curId = id; const s = db.find(x=>x.id===id); document.getElementById('editName').value = s.name; document.getElementById('editNote').value = s.note; document.getElementById('editModal').style.display = 'flex'; };
