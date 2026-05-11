@@ -155,37 +155,40 @@
 
     // --- 圖片壓縮邏輯 ---
     const processImageSet = (file) => {
-        return new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => reject("處理逾時"), 12000);
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = (e) => {
-                const img = new Image();
-                img.src = e.target.result;
-                img.onload = () => {
-                    const getCanvasData = (maxSize, quality) => {
-                        const canvas = document.createElement('canvas');
-                        let w = img.width, h = img.height;
-                        if (w > maxSize) { h *= maxSize / w; w = maxSize; }
-                        canvas.width = w; canvas.height = h;
-                        const ctx = canvas.getContext('2d');
-                        ctx.imageSmoothingEnabled = true;
-                        ctx.imageSmoothingQuality = 'low';
-                        ctx.drawImage(img, 0, 0, w, h);
-                        return canvas.toDataURL('image/jpeg', quality);
-                    };
-                    try {
-                        const result = { large: getCanvasData(500, 0.4), thumb: getCanvasData(120, 0.3) };
-                        clearTimeout(timeout);
-                        resolve(result);
-                    } catch (err) {
-                        clearTimeout(timeout);
-                        reject("記憶體不足");
-                    }
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject("處理逾時"), 12000);
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (e) => {
+            const img = new Image();
+            img.src = e.target.result;
+            img.onload = () => {
+                const getCanvasData = (maxSize, quality) => {
+                    const canvas = document.createElement('canvas');
+                    let w = img.width, h = img.height;
+                    if (w > maxSize) { h *= maxSize / w; w = maxSize; }
+                    canvas.width = w; canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'medium'; // 稍微提升平滑度
+                    ctx.drawImage(img, 0, 0, w, h);
+                    return canvas.toDataURL('image/jpeg', quality);
                 };
+                try {
+                    const result = { 
+                        large: getCanvasData(500, 0.4), // 大圖維持 0.4 確保不卡頓
+                        thumb: getCanvasData(120, 0.7)  // 縮圖品質調回 0.7
+                    };
+                    clearTimeout(timeout);
+                    resolve(result);
+                } catch (err) {
+                    clearTimeout(timeout);
+                    reject("記憶體不足");
+                }
             };
-        });
-    };
+        };
+    });
+};
 
     window.switchPage = (pageId) => {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
