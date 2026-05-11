@@ -205,6 +205,7 @@
         const f = document.getElementById('newFile').files[0];
         const btn = document.getElementById('addBtn');
         const hint = document.getElementById('loadingHint');
+        const noteEl = document.getElementById('newNote'); // 獲取備註欄位
 
         if (!n || !f) return alert("請填寫名稱並選擇照片");
 
@@ -218,7 +219,7 @@
                 id: Date.now(), 
                 name: n, 
                 category: document.getElementById('newCategory').value, 
-                note: document.getElementById('newNote').value, 
+                note: noteEl.value, // 儲存當前備註
                 image: imgs.large, 
                 thumb: imgs.thumb, 
                 details: [], 
@@ -228,11 +229,15 @@
             db.unshift(newShop);
             sync(); // 背景同步
 
+            // --- 核心修正：上傳後清空並重置欄位 ---
             document.getElementById('newName').value = ""; 
             document.getElementById('newFile').value = "";
+            // 將備註欄位重置回初始範本
+            noteEl.value = "電話：\n時間：\n公休:";
+            
             renderAdminGrid();
             
-            alert("✅ 新增成功！(高畫質版)");
+            alert("✅ 新增成功！(備註已重置)");
         } catch (error) {
             alert("❌ 失敗：" + error);
         } finally {
