@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>訂單管理系統 - 登入修復完美版</title>
+    <title>訂單管理系統 - 介面優化版</title>
     <style>
         :root { --primary: #4a90e2; --secondary: #34495e; --bg: #f5f7fa; --danger: #ff4d4f; --edit: #f39c12; --success: #2ecc71; }
         body { font-family: "Microsoft JhengHei", sans-serif; background: var(--bg); margin: 0; padding: 0; color: #333; -webkit-tap-highlight-color: transparent; }
@@ -57,7 +57,12 @@
         .role-btn { flex: 1; padding: 15px; border: 2px solid #e2e8f0; border-radius: 12px; background: white; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
         .role-btn.selected { border-color: var(--primary); background: rgba(74,144,226,0.08); color: var(--primary); }
         
-        .status-footer { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid #e2e8f0; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #64748b; z-index: 99; }
+        .status-footer { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid #e2e2f0; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #64748b; z-index: 99; }
+        
+        .summary-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+        .summary-table td { padding: 12px 8px; border-bottom: 1px solid #edf2f7; vertical-align: middle; }
+        .paid-row { background-color: #f0fdf4; color: #a3a3a3; text-decoration: line-through; }
+        .user-summary-card { background: #f8fafc; border: 1px solid #edf2f7; border-radius: 8px; padding: 10px 12px; margin-bottom: 4px; transition: 0.2s; }
     </style>
 </head>
 <body>
@@ -185,8 +190,7 @@
     let currentNickname = localStorage.getItem('order_current_nickname') || '';
     let selectedLoginRole = '';
 
-    // 將登入控制與搬家機制掛載到全域，確保 HTML 按鈕100%可以讀取到
-    window.selectRole = (role) => {
+    window.selectRole = function(role) {
         selectedLoginRole = role;
         document.getElementById('btnRoleUser').classList.remove('selected');
         document.getElementById('btnRoleAdmin').classList.remove('selected');
@@ -194,7 +198,7 @@
         if (role === '值日生') document.getElementById('btnRoleAdmin').classList.add('selected');
     };
 
-    window.submitLogin = () => {
+    window.submitLogin = function() {
         const nickname = document.getElementById('userNickname').value.trim();
         if (!nickname) return alert("請輸入您的暱稱！");
         if (!selectedLoginRole) return alert("請選取您的身分（食客 或 值日生）！");
@@ -205,9 +209,10 @@
         document.getElementById('loginOverlay').style.display = 'none';
         applyRolePermissions();
         renderViewPage();
+        renderSummaryPage();
     };
 
-    window.logout = () => {
+    window.logout = function() {
         if(confirm("確定要登出並切換身分嗎？")) {
             localStorage.removeItem('order_current_role');
             localStorage.removeItem('order_current_nickname');
@@ -225,12 +230,9 @@
         try {
             const oldSnapshot = await get(oldDbRef);
             const newSnapshot = await get(dbRef);
-            
             if (oldSnapshot.exists() && !newSnapshot.exists()) {
-                console.log("偵測到 V23 舊菜單，開始進行數據搬移...");
                 const oldData = oldSnapshot.val();
                 const oldShopsArray = Array.isArray(oldData) ? oldData : Object.values(oldData);
-                
                 for (let shop of oldShopsArray) {
                     if (shop && typeof shop === 'object') {
                         if (!shop.details) shop.details = [];
@@ -239,10 +241,9 @@
                         await set(newShopRef, shop);
                     }
                 }
-                console.log("🎉 舊資料搬家完成！");
             }
         } catch (error) {
-            console.error("遷移數據時發生錯誤:", error);
+            console.error(error);
         }
     }
 
@@ -260,7 +261,6 @@
         }
     }
 
-    // 初始化與監聽
     window.addEventListener('DOMContentLoaded', () => {
         if (currentRole && currentNickname) {
             document.getElementById('loginOverlay').style.display = 'none';
@@ -275,19 +275,18 @@
         const data = snapshot.val();
         db = [];
         rawKeysMap = {};
-        
         if (data) {
             Object.entries(data).forEach(([key, val]) => {
                 if (val && typeof val === 'object') {
                     rawKeysMap[val.id] = key; 
                     if (!val.details) val.details = [];
+                    val.details.forEach(d => { if(d.isPaid === undefined) d.isPaid = false; });
                     if (!val.imageList) val.imageList = val.image ? [{large: val.image, thumb: val.image}] : [];
                     db.push(val);
                 }
             });
         }
         db.sort((a, b) => b.id - a.id);
-
         renderViewPage();
         renderAdminGrid();
         renderSummaryPage();
@@ -295,9 +294,7 @@
 
     const updateSingleShop = (shop) => {
         const key = rawKeysMap[shop.id];
-        if(key) {
-            return set(ref(database, `orderSystem_V24_Shops/${key}`), shop);
-        }
+        if(key) return set(ref(database, `orderSystem_V24_Shops/${key}`), shop);
     };
 
     const convertToBase64 = (file) => {
@@ -332,37 +329,23 @@
         const files = document.getElementById('newFile').files;
         const btn = document.getElementById('addBtn');
         if(!n || files.length === 0) return alert("請填寫名稱與圖片");
-        
         btn.disabled = true; 
         document.getElementById('loadingHint').style.display = 'block';
-        
         try {
             const imageList = [];
             for(let i = 0; i < files.length; i++) { 
                 const base64Data = await convertToBase64(files[i]);
                 imageList.push(base64Data);
             }
-            
-            const newShopData = { 
-                id: Date.now(), 
-                name: n, 
-                category: document.getElementById('newCategory').value, 
-                note: document.getElementById('newNote').value, 
-                imageList, 
-                details: [], 
-                visible: false 
-            };
-            
+            const newShopData = { id: Date.now(), name: n, category: document.getElementById('newCategory').value, note: document.getElementById('newNote').value, imageList, details: [], visible: false };
             const newShopRef = push(dbRef);
             await set(newShopRef, newShopData);
-            
             document.getElementById('newName').value = ""; 
             document.getElementById('newFile').value = "";
             document.getElementById('newNote').value = "電話：\n時間：\n公休:";
-            
-            alert("✨ 新增成功，資料已同步至雲端！");
+            alert("✨ 新增成功！");
         } catch(e) { 
-            alert("上傳失敗，請重試。"); console.error(e);
+            alert("上傳失敗");
         } finally {
             btn.disabled = false; 
             document.getElementById('loadingHint').style.display = 'none';
@@ -372,11 +355,8 @@
     window.renderAdminGrid = () => {
         const kw = document.getElementById('adminSearch').value.toLowerCase();
         const filtered = db.filter(s => {
-            const matchKw = s.name.toLowerCase().includes(kw);
-            const matchCat = (currentFilter === '全部' || s.category === currentFilter || (currentFilter === '點心' && s.category === '甜品'));
-            return matchKw && matchCat;
+            return s.name.toLowerCase().includes(kw) && (currentFilter === '全部' || s.category === currentFilter || (currentFilter === '點心' && s.category === '甜品'));
         });
-
         document.getElementById('historyGrid').innerHTML = filtered.map(s => `
             <div class="history-card ${s.visible ? 'is-active' : ''}">
                 <div class="thumb-box" onclick="toggleShop(${s.id})">
@@ -393,11 +373,11 @@
             </div>`).join('');
     };
 
+    // 📋 今日點餐修正：全面移除 Checkbox 欄位與勾選框，只保留資訊與刪除鍵
     window.renderViewPage = () => {
         const active = db.filter(s => s.visible);
         document.getElementById('emptyViewHint').style.display = active.length ? 'none' : 'block';
         const chipsHTML = nameHistory.map(n => `<span class="chip" onclick="window.quickFillName(ID_HOLDER, '${n}')">${n}</span>`).join('');
-        
         document.getElementById('activeOrdersList').innerHTML = active.map(s => {
             const imgs = s.imageList || [];
             return `
@@ -417,10 +397,12 @@
                     </div>
                     <table style="width:100%; font-size:14px;">
                         <tbody>${(s.details || []).map((d, idx) => `
-                            <tr style="border-bottom:1px solid #f0f0f0; ${d.isDone ? 'opacity:0.4; text-decoration:line-through' : ''}">
-                                <td width="30"><input type="checkbox" ${d.isDone ? 'checked' : ''} onchange="toggleOrder(${s.id},${idx})" ${currentRole !== '值日生' ? 'disabled' : ''}></td>
-                                <td style="padding:10px 0;">${d.person} - ${d.item} (${d.money}) ${d.note ? `<br><small style="color:var(--edit)">※${d.note}</small>` : ''}</td>
-                                <td width="30" align="center" onclick="delOrder(${s.id},${idx})" style="color:red; cursor:pointer;">✕</td>
+                            <tr style="border-bottom:1px solid #f0f0f0;">
+                                <td style="padding:12px 6px;">
+                                    <b>${d.person}</b> - ${d.item} <span style="color:#2c3e50; font-weight:bold;">($${d.money})</span>
+                                    ${d.note ? `<br><small style="color:var(--edit)">※${d.note}</small>` : ''}
+                                </td>
+                                <td width="40" align="center" onclick="delOrder(${s.id},${idx})" style="color:var(--danger); font-weight:bold; cursor:pointer; font-size:16px;">✕</td>
                             </tr>`).join('')}
                         </tbody>
                     </table>
@@ -428,23 +410,158 @@
         }).join('');
     };
 
-    window.renderSummaryPage = () => {
-        const active = db.filter(s => s.visible && s.details?.length);
-        document.getElementById('summaryContent').innerHTML = active.length ? active.map(s => {
-            const counts = {}; let total = 0;
-            s.details.forEach(d => { const k = `${d.item}${d.note?' ('+d.note+')':''}`; counts[k] = (counts[k]||0)+1; total += Number(d.money); });
-            return `<div class="shop-order-card"><h3>${s.name} 統計</h3><div style="background:#f8fafc; padding:15px; border-radius:8px;">${Object.entries(counts).map(([k,v])=>`<div>${k}: <b>${v} 份</b></div>`).join('')}<hr style="margin:10px 0; border:0; border-top:1px dashed #ccc;"><b>總金額：$ ${total}</b></div></div>`;
-        }).join('') : '<div style="text-align:center; padding:50px; color:#94a3b8;">無統計資料</div>';
+    window.renderSummaryPage = function() {
+        const active = db.filter(s => s.visible && s.details && s.details.length > 0);
+        if (!active.length) {
+            document.getElementById('summaryContent').innerHTML = '<div style="text-align:center; padding:50px; color:#94a3b8;">無統計資料</div>';
+            return;
+        }
+
+        let globalTotalMoney = 0;
+        let globalUnpaidMoney = 0;
+        let individualShopsHtml = ""; 
+
+        for (let i = 0; i < active.length; i++) {
+            const s = active[i];
+            const counts = {}; 
+            for (let j = 0; j < s.details.length; j++) {
+                const d = s.details[j];
+                const k = d.item + (d.note ? " (" + d.note + ")" : "");
+                counts[k] = (counts[k] || 0) + 1;
+            }
+            
+            let countsListHtml = "";
+            const entries = Object.entries(counts);
+            for (let c = 0; c < entries.length; c++) {
+                countsListHtml += '<div style="margin:6px 0; font-size:14px;">' + entries[c][0] + ': <b style="color:#2c3e50; font-size:15px;">' + entries[c][1] + ' 份</b></div>';
+            }
+
+            individualShopsHtml += '<div class="shop-order-card">' +
+                '<h3 style="margin-top:0; color:var(--secondary);">📦 ' + s.name + ' 份數統計</h3>' +
+                '<div style="background:#f8fafc; padding:12px 15px; border-radius:12px; border:1px solid #e2e8f0;">' +
+                    countsListHtml +
+                '</div>' +
+            '</div>';
+        }
+
+        const userGroups = {};
+
+        for (let i = 0; i < active.length; i++) {
+            const s = active[i];
+            for (let j = 0; j < s.details.length; j++) {
+                const d = s.details[j];
+                const personName = d.person || "未知";
+                const cost = Number(d.money) || 0;
+                
+                globalTotalMoney += cost;
+                if (!d.isPaid) {
+                    globalUnpaidMoney += cost;
+                }
+
+                if (!userGroups[personName]) {
+                    userGroups[personName] = {
+                        itemsList: [],
+                        totalUserMoney: 0,
+                        allPaid: true, 
+                        refs: [] 
+                    };
+                }
+
+                userGroups[personName].totalUserMoney += cost;
+                if (!d.isPaid) userGroups[personName].allPaid = false;
+
+                const noteText = d.note ? ' (' + d.note + ')' : '';
+                const itemDesc = '<span style="color:#64748b; font-size:11px; background:#eef2f6; padding:1px 4px; border-radius:3px;">' + s.name + '</span> ' + d.item + noteText + ' <b style="color:#2c3e50;">$' + d.money + '</b>';
+                userGroups[personName].itemsList.push(itemDesc);
+                userGroups[personName].refs.push({ shopId: s.id, detailIdx: j });
+            }
+        }
+
+        let totalDetailsRows = "";
+        const userEntries = Object.entries(userGroups);
+
+        for (let u = 0; u < userEntries.length; u++) {
+            const name = userEntries[u][0];
+            const data = userEntries[u][1];
+            
+            const isDisabled = currentRole !== '值日生' ? 'disabled' : '';
+            const rowClass = data.allPaid ? 'paid-row' : '';
+
+            let subItemsHtml = "";
+            for (let k = 0; k < data.itemsList.length; k++) {
+                subItemsHtml += '<div style="margin-top:4px; font-size:13px; padding-left:5px; border-left:2px solid #cbd5e1;">' + data.itemsList[k] + '</div>';
+            }
+
+            const refsJson = JSON.stringify(data.refs).replace(/"/g, '&quot;');
+
+            totalDetailsRows += '<tr class="' + rowClass + '">' +
+                '<td width="45" align="center" valign="top" style="padding-top:14px;">' +
+                    '<input type="checkbox" style="width:20px; height:20px; cursor:pointer;" ' + (data.allPaid ? 'checked' : '') + ' ' + isDisabled + ' onchange="window.toggleUserAllPayments(this, ' + refsJson + ')">' +
+                '</td>' +
+                '<td>' +
+                    '<div class="user-summary-card" style="' + (data.allPaid ? 'opacity:0.6;' : '') + '">' +
+                        '<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #edf2f7; padding-bottom:4px;">' +
+                            '<span style="font-size:15px; font-weight:bold; color:var(--secondary);">👤 ' + name + '</span>' +
+                            '<span style="font-size:14px; font-weight:bold; color:' + (data.allPaid ? '#a3a3a3' : 'var(--primary)') + ';">今日總計: $' + data.totalUserMoney + '</span>' +
+                        '</div>' +
+                        '<div>' + subItemsHtml + '</div>' +
+                    '</div>' +
+                '</td>' +
+            '</tr>';
+        }
+
+        const roleHint = currentRole !== '值日生' ? '<small style="color:#94a3b8; font-weight:normal;">(僅值日生可勾選)</small>' : '';
+
+        const paymentTableHtml = '<div class="shop-order-card" style="border-top: 4px solid var(--primary);">' +
+            '<h3 style="margin-top:0; color:var(--primary);">💰 今日所有點餐人收款明細 ' + roleHint + '</h3>' +
+            '<table class="summary-table"><tbody>' + totalDetailsRows + '</tbody></table>' +
+            '<div style="margin-top:20px; padding-top:15px; border-top:2px solid #edf2f7; display:flex; justify-content:space-between; font-size:16px; font-weight:bold;">' +
+                '<div>應收總額：<b style="font-size:20px; color:var(--secondary);">' + '$' + globalTotalMoney + '</b></div>' +
+                '<div>未收餘額：<b style="font-size:20px; color:var(--danger);">' + '$' + globalUnpaidMoney + '</b></div>' +
+            '</div>' +
+        '</div>';
+
+        document.getElementById('summaryContent').innerHTML = individualShopsHtml + paymentTableHtml;
+    };
+
+    window.toggleUserAllPayments = function(checkbox, refs) {
+        if (currentRole !== '值日生') return;
+        const targetStatus = checkbox.checked; 
+
+        for (let i = 0; i < refs.length; i++) {
+            const refItem = refs[i];
+            const s = db.find(x => x.id === refItem.shopId);
+            if (s && s.details && s.details[refItem.detailIdx]) {
+                s.details[refItem.detailIdx].isPaid = targetStatus;
+            }
+        }
+
+        renderSummaryPage();
+
+        let activeShops = db.filter(x => x.visible);
+        let updateCount = 0;
+        for (let i = 0; i < db.length; i++) {
+            if (db[i].visible) {
+                const key = rawKeysMap[db[i].id];
+                if (key) {
+                    set(ref(database, `orderSystem_V24_Shops/${key}`), db[i]).then(() => {
+                        updateCount++;
+                        if (updateCount === activeShops.length) {
+                            renderSummaryPage();
+                        }
+                    });
+                }
+            }
+        }
     };
 
     window.addDetail = (id) => {
         const p = document.getElementById(`p-${id}`).value, i = document.getElementById(`i-${id}`).value, m = document.getElementById(`m-${id}`).value, n = document.getElementById(`n-${id}`).value;
         if(!p || !i || !m) return alert("請填寫姓名、餐點、金額");
         if(!nameHistory.includes(p)) { nameHistory.unshift(p); nameHistory = nameHistory.slice(0,10); localStorage.setItem('order_names', JSON.stringify(nameHistory)); }
-        
         const s = db.find(x => x.id === id); 
         if(!s.details) s.details = [];
-        s.details.push({ person: p, item: i, money: Number(m), note: n, isDone: false });
+        s.details.push({ person: p, item: i, money: Number(m), note: n, isDone: false, isPaid: false });
         updateSingleShop(s);
         document.getElementById(`i-${id}`).value = ""; document.getElementById(`m-${id}`).value = "";
     };
@@ -455,15 +572,6 @@
         if (currentRole !== '值日生') return;
         const s = db.find(x=>x.id===id); 
         if(s) { s.visible = !s.visible; updateSingleShop(s); }
-    };
-    
-    window.toggleOrder = (sId, idx) => { 
-        if (currentRole !== '值日生') return;
-        const s = db.find(s=>s.id===sId);
-        if(s && s.details && s.details[idx]) {
-            s.details[idx].isDone = !s.details[idx].isDone; 
-            updateSingleShop(s);
-        }
     };
     
     window.delOrder = (sId, idx) => { 
@@ -480,9 +588,7 @@
         if (currentRole !== '值日生') return alert("只有值日生能刪除餐廳");
         if(confirm("永久刪除該餐廳？")) { 
             const key = rawKeysMap[id];
-            if(key) {
-                set(ref(database, `orderSystem_V24_Shops/${key}`), null);
-            }
+            if(key) set(ref(database, `orderSystem_V24_Shops/${key}`), null);
         } 
     };
     
