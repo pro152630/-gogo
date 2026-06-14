@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>訂單管理系統 - 介面優化版</title>
+    <title>訂單管理系統 - 安全與高併發優化版</title>
     <style>
         :root { --primary: #4a90e2; --secondary: #34495e; --bg: #f5f7fa; --danger: #ff4d4f; --edit: #f39c12; --success: #2ecc71; }
         body { font-family: "Microsoft JhengHei", sans-serif; background: var(--bg); margin: 0; padding: 0; color: #333; -webkit-tap-highlight-color: transparent; }
@@ -163,7 +163,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getDatabase, ref, set, push, onValue, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    import { getDatabase, ref, set, push, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyDvyMOFN_SkG7akkuoCH59EThRy0hJHDs4",
@@ -178,11 +178,13 @@
     const app = initializeApp(firebaseConfig);
     const database = getDatabase(app);
     
+    // 🧱 核心微調：拆分為 餐廳主體 節點 與 獨立點餐明細 節點（防多人同時覆蓋）
     const dbRef = ref(database, 'orderSystem_V24_Shops');
-    const oldDbRef = ref(database, 'orderSystem_V23');
+    const itemsRef = ref(database, 'orderSystem_V24_Items');
 
     let db = []; 
     let rawKeysMap = {}; 
+    let allOrderItems = {}; // 存放解構後的獨立訂單資料
     let currentFilter = '全部';
     let nameHistory = JSON.parse(localStorage.getItem('order_names') || '[]');
     
@@ -226,27 +228,6 @@
         }
     };
 
-    async function checkAndMigrateV23Data() {
-        try {
-            const oldSnapshot = await get(oldDbRef);
-            const newSnapshot = await get(dbRef);
-            if (oldSnapshot.exists() && !newSnapshot.exists()) {
-                const oldData = oldSnapshot.val();
-                const oldShopsArray = Array.isArray(oldData) ? oldData : Object.values(oldData);
-                for (let shop of oldShopsArray) {
-                    if (shop && typeof shop === 'object') {
-                        if (!shop.details) shop.details = [];
-                        if (!shop.imageList) shop.imageList = shop.image ? [{large: shop.image, thumb: shop.image}] : [];
-                        const newShopRef = push(dbRef);
-                        await set(newShopRef, shop);
-                    }
-                }
-            }
-        } catch (error) {
-            console.error(error);
-        }
-    }
-
     function applyRolePermissions() {
         document.getElementById('footerName').innerText = currentNickname;
         document.getElementById('footerRole').innerText = currentRole;
@@ -268,9 +249,9 @@
         } else {
             document.getElementById('loginOverlay').style.display = 'flex';
         }
-        checkAndMigrateV23Data();
     });
 
+    // 📡 同時監聽餐廳基本資料
     onValue(dbRef, (snapshot) => {
         const data = snapshot.val();
         db = [];
@@ -279,18 +260,42 @@
             Object.entries(data).forEach(([key, val]) => {
                 if (val && typeof val === 'object') {
                     rawKeysMap[val.id] = key; 
-                    if (!val.details) val.details = [];
-                    val.details.forEach(d => { if(d.isPaid === undefined) d.isPaid = false; });
                     if (!val.imageList) val.imageList = val.image ? [{large: val.image, thumb: val.image}] : [];
                     db.push(val);
                 }
             });
         }
         db.sort((a, b) => b.id - a.id);
+        combineAndRender();
+    });
+
+    // 📡 同時監聽高併發獨立點餐明細項目
+    onValue(itemsRef, (snapshot) => {
+        allOrderItems = snapshot.val() || {};
+        combineAndRender();
+    });
+
+    // 將餐廳基本結構與獨立的明細在前端進行高速對應組合與渲染
+    function combineAndRender() {
+        db.forEach(shop => {
+            shop.details = [];
+            Object.entries(allOrderItems).forEach(([firebaseItemId, itemData]) => {
+                if (itemData.shopId === shop.id) {
+                    shop.details.push({
+                        fbKey: firebaseItemId, // 儲存獨立節點鍵值方便後續單筆精準操控
+                        person: itemData.person,
+                        item: itemData.item,
+                        money: itemData.money,
+                        note: itemData.note,
+                        isPaid: itemData.isPaid || false
+                    });
+                }
+            });
+        });
         renderViewPage();
         renderAdminGrid();
         renderSummaryPage();
-    });
+    }
 
     const updateSingleShop = (shop) => {
         const key = rawKeysMap[shop.id];
@@ -337,7 +342,7 @@
                 const base64Data = await convertToBase64(files[i]);
                 imageList.push(base64Data);
             }
-            const newShopData = { id: Date.now(), name: n, category: document.getElementById('newCategory').value, note: document.getElementById('newNote').value, imageList, details: [], visible: false };
+            const newShopData = { id: Date.now(), name: n, category: document.getElementById('newCategory').value, note: document.getElementById('newNote').value, imageList, visible: false };
             const newShopRef = push(dbRef);
             await set(newShopRef, newShopData);
             document.getElementById('newName').value = ""; 
@@ -373,7 +378,6 @@
             </div>`).join('');
     };
 
-    // 📋 今日點餐修正：全面移除 Checkbox 欄位與勾選框，只保留資訊與刪除鍵
     window.renderViewPage = () => {
         const active = db.filter(s => s.visible);
         document.getElementById('emptyViewHint').style.display = active.length ? 'none' : 'block';
@@ -402,7 +406,7 @@
                                     <b>${d.person}</b> - ${d.item} <span style="color:#2c3e50; font-weight:bold;">($${d.money})</span>
                                     ${d.note ? `<br><small style="color:var(--edit)">※${d.note}</small>` : ''}
                                 </td>
-                                <td width="40" align="center" onclick="delOrder(${s.id},${idx})" style="color:var(--danger); font-weight:bold; cursor:pointer; font-size:16px;">✕</td>
+                                <td width="40" align="center" onclick="window.delOrderSecure('${d.fbKey}', '${d.person}')" style="color:var(--danger); font-weight:bold; cursor:pointer; font-size:16px;">✕</td>
                             </tr>`).join('')}
                         </tbody>
                     </table>
@@ -463,7 +467,7 @@
                         itemsList: [],
                         totalUserMoney: 0,
                         allPaid: true, 
-                        refs: [] 
+                        fbKeysList: [] 
                     };
                 }
 
@@ -473,7 +477,7 @@
                 const noteText = d.note ? ' (' + d.note + ')' : '';
                 const itemDesc = '<span style="color:#64748b; font-size:11px; background:#eef2f6; padding:1px 4px; border-radius:3px;">' + s.name + '</span> ' + d.item + noteText + ' <b style="color:#2c3e50;">$' + d.money + '</b>';
                 userGroups[personName].itemsList.push(itemDesc);
-                userGroups[personName].refs.push({ shopId: s.id, detailIdx: j });
+                userGroups[personName].fbKeysList.push(d.fbKey);
             }
         }
 
@@ -492,11 +496,11 @@
                 subItemsHtml += '<div style="margin-top:4px; font-size:13px; padding-left:5px; border-left:2px solid #cbd5e1;">' + data.itemsList[k] + '</div>';
             }
 
-            const refsJson = JSON.stringify(data.refs).replace(/"/g, '&quot;');
+            const fbKeysJson = JSON.stringify(data.fbKeysList).replace(/"/g, '&quot;');
 
             totalDetailsRows += '<tr class="' + rowClass + '">' +
                 '<td width="45" align="center" valign="top" style="padding-top:14px;">' +
-                    '<input type="checkbox" style="width:20px; height:20px; cursor:pointer;" ' + (data.allPaid ? 'checked' : '') + ' ' + isDisabled + ' onchange="window.toggleUserAllPayments(this, ' + refsJson + ')">' +
+                    '<input type="checkbox" style="width:20px; height:20px; cursor:pointer;" ' + (data.allPaid ? 'checked' : '') + ' ' + isDisabled + ' onchange="window.toggleUserAllPaymentsSecure(this, ' + fbKeysJson + ')">' +
                 '</td>' +
                 '<td>' +
                     '<div class="user-summary-card" style="' + (data.allPaid ? 'opacity:0.6;' : '') + '">' +
@@ -524,46 +528,54 @@
         document.getElementById('summaryContent').innerHTML = individualShopsHtml + paymentTableHtml;
     };
 
-    window.toggleUserAllPayments = function(checkbox, refs) {
+    // 🧱 核心微調：大重組勾選改為批次更新獨立高併發項目節點
+    window.toggleUserAllPaymentsSecure = function(checkbox, fbKeysList) {
         if (currentRole !== '值日生') return;
         const targetStatus = checkbox.checked; 
 
-        for (let i = 0; i < refs.length; i++) {
-            const refItem = refs[i];
-            const s = db.find(x => x.id === refItem.shopId);
-            if (s && s.details && s.details[refItem.detailIdx]) {
-                s.details[refItem.detailIdx].isPaid = targetStatus;
-            }
-        }
-
+        // 搶先本地修改顯示數值防閃爍
+        fbKeysList.forEach(key => {
+            if (allOrderItems[key]) allOrderItems[key].isPaid = targetStatus;
+        });
         renderSummaryPage();
 
-        let activeShops = db.filter(x => x.visible);
-        let updateCount = 0;
-        for (let i = 0; i < db.length; i++) {
-            if (db[i].visible) {
-                const key = rawKeysMap[db[i].id];
-                if (key) {
-                    set(ref(database, `orderSystem_V24_Shops/${key}`), db[i]).then(() => {
-                        updateCount++;
-                        if (updateCount === activeShops.length) {
-                            renderSummaryPage();
-                        }
-                    });
-                }
-            }
-        }
+        // 批次非同步高速推入資料庫個別節點
+        fbKeysList.forEach(key => {
+            set(ref(database, `orderSystem_V24_Items/${key}/isPaid`), targetStatus);
+        });
     };
 
+    // 🧱 核心微調：送出點餐時，改用獨立 push() 發送不卡單，也不用下載覆蓋整間餐廳
     window.addDetail = (id) => {
         const p = document.getElementById(`p-${id}`).value, i = document.getElementById(`i-${id}`).value, m = document.getElementById(`m-${id}`).value, n = document.getElementById(`n-${id}`).value;
         if(!p || !i || !m) return alert("請填寫姓名、餐點、金額");
         if(!nameHistory.includes(p)) { nameHistory.unshift(p); nameHistory = nameHistory.slice(0,10); localStorage.setItem('order_names', JSON.stringify(nameHistory)); }
-        const s = db.find(x => x.id === id); 
-        if(!s.details) s.details = [];
-        s.details.push({ person: p, item: i, money: Number(m), note: n, isDone: false, isPaid: false });
-        updateSingleShop(s);
+        
+        const newItemData = {
+            shopId: id,
+            person: p,
+            item: i,
+            money: Number(m),
+            note: n,
+            isPaid: false
+        };
+
+        const singlePushRef = push(itemsRef);
+        set(singlePushRef, newItemData);
+
         document.getElementById(`i-${id}`).value = ""; document.getElementById(`m-${id}`).value = "";
+    };
+
+    // 🛡️ 防呆機制：嚴格限制食客只能刪除自己暱稱的餐點
+    window.delOrderSecure = (fbKey, itemOwnerName) => {
+        if (currentRole !== '值日生' && itemOwnerName !== currentNickname) {
+            alert(`❌ 您只能刪除自己的餐點！\n這是 [ ${itemOwnerName} ] 的餐點，您無法刪除。`);
+            return;
+        }
+
+        if(confirm(`確定要刪除這筆點餐嗎？`)) {
+            set(ref(database, `orderSystem_V24_Items/${fbKey}`), null);
+        }
     };
 
     window.quickFillName = (id, name) => document.getElementById(`p-${id}`).value = name;
@@ -572,16 +584,6 @@
         if (currentRole !== '值日生') return;
         const s = db.find(x=>x.id===id); 
         if(s) { s.visible = !s.visible; updateSingleShop(s); }
-    };
-    
-    window.delOrder = (sId, idx) => { 
-        if(confirm("確定刪除此筆點餐？")) { 
-            const s = db.find(s=>s.id===sId);
-            if(s && s.details) {
-                s.details.splice(idx,1); 
-                updateSingleShop(s);
-            }
-        } 
     };
     
     window.delShop = (id) => { 
@@ -597,11 +599,14 @@
         document.getElementById('lightbox').style.display = 'flex'; 
     };
     
+    // 🧱 核心微調：清空全日紀錄改為直接抹除點餐明細大節點
     window.resetAllOrders = () => { 
         if (currentRole !== '值日生') return alert("只有值日生能清空紀錄");
         if(confirm("確定要清空今日紀錄，並將所有餐廳重置為休息中嗎？")) { 
+            // 1. 清空獨立點餐明細
+            set(itemsRef, null);
+            // 2. 餐廳重設為休息中
             db.forEach(s => {
-                s.details = [];   
                 s.visible = false; 
                 updateSingleShop(s);
             }); 
